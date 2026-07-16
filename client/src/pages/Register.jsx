@@ -300,6 +300,10 @@ function RegisterPage() {
 
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState('register')
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -344,12 +348,58 @@ function RegisterPage() {
         localStorage.setItem('user', JSON.stringify(response.data))
       }
       
-      navigate('/taste') // go to taste profile flow after register
+      setStep('otp') // go to taste profile flow after register
     } catch (err) {
       const message = err.response?.data?.message || 'Something went wrong. Please try again.'
       setErrors({ general: message })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (e) => {
+  e.preventDefault()
+  if (!otp.trim() || otp.length !== 6) {
+    setOtpError('enter the 6-digit code')
+    return
+  }
+
+  setLoading(true)
+  setOtpError('')
+  try {
+    const response = await authAPI.verifyOtp({ email: form.email, otp })
+
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token)
+      localStorage.setItem('user', JSON.stringify(response.data))
+    }
+
+    navigate('/taste')
+  } catch (err) {
+    const message = err.response?.data?.message || 'invalid or expired code'
+    setOtpError(message)
+  } finally {
+    setLoading(false)
+  }
+}
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return
+    try {
+      await authAPI.resendOtp({ email: form.email })
+      setOtpError('')
+      setResendCooldown(30)
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    } catch (err) {
+      setOtpError(err.response?.data?.message || 'failed to resend code')
     }
   }
 
@@ -378,7 +428,7 @@ function RegisterPage() {
         <FormHeader>
           <FormTitle>Create your<br />account.</FormTitle>
         </FormHeader>
-
+        {step === 'register' ? (
         <Form onSubmit={handleSubmit} noValidate>
 
           <FieldRow>
@@ -461,6 +511,50 @@ function RegisterPage() {
           </LoginPrompt>
 
         </Form>
+      ) : (
+        <Form onSubmit={handleVerifyOtp} noValidate>
+
+          <FormSubtitle style={{ marginBottom: '0.5rem' }}>
+            we sent a 6-digit code to <strong>{form.email}</strong>
+          </FormSubtitle>
+
+          <Field>
+            <Label htmlFor="otp">verification code</Label>
+            <Input
+              id="otp"
+              name="otp"
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              value={otp}
+              onChange={(e) => {
+                setOtp(e.target.value.replace(/\D/g, ''))
+                if (otpError) setOtpError('')
+              }}
+              style={{ letterSpacing: '0.5em', fontSize: '1.3rem', textAlign: 'center' }}
+            />
+            {otpError && <ErrorText>{otpError}</ErrorText>}
+          </Field>
+
+          <SubmitBtn type="submit" disabled={loading}>
+            {loading ? 'verifying...' : 'verify →'}
+          </SubmitBtn>
+
+          <LoginPrompt>
+            didn't get a code?{' '}
+            {resendCooldown > 0 ? (
+              <span>resend in {resendCooldown}s</span>
+            ) : (
+              <a href="#" onClick={(e) => { e.preventDefault(); handleResendOtp() }}>
+                resend code
+              </a>
+            )}
+          </LoginPrompt>
+
+        </Form>
+      )}
+      
       </LeftPanel>
 
     </PageWrapper>

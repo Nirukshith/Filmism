@@ -6,7 +6,6 @@ const connectDB   = require('./config/db')
 const { errorHandler } = require('./middleware/errorMiddleware')
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
-connectDB()
 
 const app = express()
 
@@ -26,6 +25,16 @@ app.get('/', (req, res) => {
 })
 
 const PORT = process.env.PORT || 5001
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`)
+
+const startServer = async () => {
+  await connectDB()
+
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`)
+  })
+}
+
+startServer().catch((error) => {
+  console.error(`Server startup failed: ${error.message}`)
+  process.exit(1)
 })

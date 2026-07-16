@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema(
       minlength: [6, 'Password must be at least 6 characters'],
     },
 
+    isVerified: { type: Boolean, default: false },
+    otp: { type: String },
+    otpExpiry: { type: Date },
+
+
     // Taste profile — filled in after register
     selectedCinemas:  { type: [String], default: [] },
     selectedGenres:   { type: [String], default: [] },
