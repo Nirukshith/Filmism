@@ -1,0 +1,13 @@
+{
+  "name": "filmism",
+  "version": "1.0.0",
+  "scripts": {
+    "client": "cd client && npm run dev",
+    "server": "(lsof -ti:5001 | xargs kill -9 2>/dev/null || true) && cd server && npm run dev",
+    "dev": "concurrently \"npm run client\" \"npm run server\""
+  },
+
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
