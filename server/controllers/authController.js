@@ -1,7 +1,8 @@
 const User = require('../models/userModel')
 const jwt  = require('jsonwebtoken')
 const bcrypt = require('bcryptjs') 
-const sendOtpEmail = require('../utils/sendEmail')         
+const sendOtpEmail = require('../utils/sendEmail')
+const { mapNamesToIds, mapIdsToNames } = require('../utils/genreMap')         
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -91,6 +92,10 @@ const verifyOtp = async (req, res) => {
       lastName:  user.lastName,
       email:     user.email,
       token:     generateToken(user._id),
+      selectedCinemas: user.selectedCinemas,
+      selectedGenres: mapIdsToNames(user.selectedGenres),
+      selectedPosters: user.selectedPosters,
+      aestheticProfile: user.aestheticProfile,
     })
   } catch (error) {
     console.error('VERIFY OTP ERROR:', error.message)
@@ -147,6 +152,10 @@ const loginUser = async (req, res) => {
         lastName:  user.lastName,
         email:     user.email,
         token:     generateToken(user._id),
+        selectedCinemas: user.selectedCinemas,
+        selectedGenres: mapIdsToNames(user.selectedGenres),
+        selectedPosters: user.selectedPosters,
+        aestheticProfile: user.aestheticProfile,
       })
     } else {
       res.status(401).json({ message: 'Invalid email or password' })
@@ -163,7 +172,9 @@ const updateTasteProfile = async (req, res) => {
 
     if (user) {
       user.selectedCinemas = req.body.selectedCinemas || user.selectedCinemas
-      user.selectedGenres = req.body.selectedGenres || user.selectedGenres
+      if (req.body.selectedGenres) {
+        user.selectedGenres = mapNamesToIds(req.body.selectedGenres)
+      }
       user.selectedPosters = req.body.selectedPosters || user.selectedPosters
       user.aestheticProfile = req.body.aestheticProfile || user.aestheticProfile
 
@@ -175,7 +186,7 @@ const updateTasteProfile = async (req, res) => {
         lastName: updatedUser.lastName,
         email: updatedUser.email,
         selectedCinemas: updatedUser.selectedCinemas,
-        selectedGenres: updatedUser.selectedGenres,
+        selectedGenres: mapIdsToNames(updatedUser.selectedGenres),
         selectedPosters: updatedUser.selectedPosters,
         aestheticProfile: updatedUser.aestheticProfile,
       })

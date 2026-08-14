@@ -1,5 +1,5 @@
 const mongoose = require('mongoose')
-const bcrypt   = require('bcryptjs')
+const bcrypt = require('bcryptjs')
 
 const userSchema = new mongoose.Schema(
   {
@@ -33,10 +33,10 @@ const userSchema = new mongoose.Schema(
 
 
     // Taste profile — filled in after register
-    selectedCinemas:  { type: [String], default: [] },
-    selectedGenres:   { type: [String], default: [] },
-    selectedPosters:  { type: [String], default: [] },
-    aestheticProfile: { type: Object,   default: null },
+    selectedCinemas: { type: [Number], default: [] }, // local Filmism cinema IDs (1–8)
+    selectedGenres: { type: [Number], default: [] }, // TMDB genre IDs
+    selectedPosters: { type: [Number], default: [] }, // TMDB film IDs
+    aestheticProfile: { type: Object, default: null },
   },
   { timestamps: true }
 )

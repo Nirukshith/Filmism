@@ -1,11 +1,14 @@
+const path        = require('path')
+const dotenv      = require('dotenv')
+
+// Initialize environment variables first so subsequent imports have access to process.env
+dotenv.config({ path: path.resolve(__dirname, '.env') })
+
 const express     = require('express')
 const cors        = require('cors')
-const dotenv      = require('dotenv')
-const path        = require('path')
 const connectDB   = require('./config/db')
 const { errorHandler } = require('./middleware/errorMiddleware')
-
-dotenv.config({ path: path.resolve(__dirname, '.env') })
+const movieRoutes = require('./routes/movieRoutes');
 
 const app = express()
 
@@ -16,6 +19,7 @@ app.use(express.urlencoded({ extended: true }))
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'))
+app.use('/api/movies', movieRoutes)
 
 // Error handler
 app.use(errorHandler)
