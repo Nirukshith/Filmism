@@ -19,8 +19,10 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' })
     }
 
+    const normalizedEmail = email.toLowerCase().trim()
+
     // Check if user already exists
-    const userExists = await User.findOne({ email })
+    const userExists = await User.findOne({ email: normalizedEmail })
     if (userExists) {
       return res.status(400).json({ message: 'An account with this email already exists' })
     }
@@ -31,9 +33,9 @@ const registerUser = async (req, res) => {
 
     // Create user as unverified, attach OTP
     const user = await User.create({
-      firstName,
-      lastName,
-      email,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
       password,
       otp: hashedOtp,
       otpExpiry: Date.now() + 5 * 60 * 1000, // 5 min
@@ -63,7 +65,8 @@ const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: 'Email and OTP are required' })
     }
 
-    const user = await User.findOne({ email })
+    const normalizedEmail = email.toLowerCase().trim()
+    const user = await User.findOne({ email: normalizedEmail })
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
@@ -108,7 +111,8 @@ const resendOtp = async (req, res) => {
   const { email } = req.body
 
   try {
-    const user = await User.findOne({ email })
+    const normalizedEmail = email?.toLowerCase().trim()
+    const user = await User.findOne({ email: normalizedEmail })
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
@@ -139,7 +143,8 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' })
     }
 
-    const user = await User.findOne({ email })
+    const normalizedEmail = email.toLowerCase().trim()
+    const user = await User.findOne({ email: normalizedEmail })
 
     if (user && !user.isVerified) {
       return res.status(401).json({ message: 'Please verify your email before logging in' })

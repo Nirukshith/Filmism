@@ -20,6 +20,8 @@ app.use(express.urlencoded({ extended: true }))
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'))
 app.use('/api/movies', movieRoutes)
+app.use('/api/taste-profile', require('./routes/tasteProfileRoutes'))
+app.use('/api/recommendations', require('./routes/recommendationRoutes'))
 
 // Error handler
 app.use(errorHandler)

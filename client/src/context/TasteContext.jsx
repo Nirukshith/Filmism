@@ -7,12 +7,27 @@ export function TasteProvider({ children }) {
   const [selectedGenres, setSelectedGenres]   = useState([])
   const [selectedCinemas, setSelectedCinemas] = useState([])
   const [selectedFilms, setSelectedFilms]     = useState([])
+  const [favoriteRatings, setFavoriteRatings] = useState({}) // { [tmdbId]: ratingNumber }
+  const [tasteClusters, setTasteClusters]     = useState([])
+  const [userTasteProfile, setUserTasteProfile] = useState(null)
+  const [aiSynthesis, setAiSynthesis]         = useState('')
+  const [sessionId, setSessionId]             = useState(() => {
+    return localStorage.getItem('filmism_session_id') || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  })
+
   const [ratings, setRatings]                 = useState({})
   const [watchlist, setWatchlist]             = useState([])
   const [haventSeen, setHaventSeen]           = useState([])
   const [aestheticProfile, setAestheticProfile] = useState(null)
 
-  // Load initial profile data from logged-in user if saved in localStorage
+  // Save guest sessionId
+  useEffect(() => {
+    if (sessionId) {
+      localStorage.setItem('filmism_session_id', sessionId)
+    }
+  }, [sessionId])
+
+  // Load initial profile data from logged-in user or session if saved in localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem('user')
     if (storedUser) {
@@ -26,9 +41,70 @@ export function TasteProvider({ children }) {
         console.error('Error parsing stored user data:', err)
       }
     }
+
+    const storedClusters = localStorage.getItem('filmism_taste_clusters')
+    if (storedClusters) {
+      try {
+        setTasteClusters(JSON.parse(storedClusters))
+      } catch (e) {}
+    }
+
+    const storedSynthesis = localStorage.getItem('filmism_ai_synthesis')
+    if (storedSynthesis) {
+      setAiSynthesis(storedSynthesis)
+    }
   }, [])
 
-  // Sync taste profile preferences to the backend
+  // Set or update a single favorite film rating (1-4, or 0)
+  const setFilmRating = (tmdbId, ratingNumber) => {
+    setFavoriteRatings((prev) => ({
+      ...prev,
+      [tmdbId]: ratingNumber,
+    }))
+  }
+
+  // Initialize taste profile and clusters with backend AI engine
+  const initializeProfile = async ({ genres, origins, films, ratingsMap = {} }) => {
+    try {
+      const g = genres || selectedGenres
+      const o = origins || selectedCinemas
+      const f = films || selectedFilms
+
+      const favoritesPayload = f.map((id) => ({
+        tmdbId: Number(id),
+        rating: ratingsMap[id] !== undefined ? ratingsMap[id] : (favoriteRatings[id] || 3),
+      }))
+
+      const response = await api.post('/taste-profile/initialize', {
+        genres: g,
+        origins: o,
+        favorites: favoritesPayload,
+        sessionId,
+      })
+
+      if (response.data?.success) {
+        const { tasteProfile, clusters, aiSynthesis: synthesis, sessionId: newSessionId } = response.data
+        setUserTasteProfile(tasteProfile)
+        setTasteClusters(clusters || [])
+        setAiSynthesis(synthesis || '')
+
+        if (newSessionId) {
+          setSessionId(newSessionId)
+          localStorage.setItem('filmism_session_id', newSessionId)
+        }
+
+        localStorage.setItem('filmism_taste_clusters', JSON.stringify(clusters || []))
+        if (synthesis) localStorage.setItem('filmism_ai_synthesis', synthesis)
+
+        return response.data
+      }
+    } catch (error) {
+      console.error('Failed to initialize taste profile:', error)
+      throw error
+    }
+  }
+
+  // Sync taste profile preferences to legacy auth profile if needed
   const syncTasteProfile = async (updatedData = {}) => {
     try {
       const genres = updatedData.selectedGenres ?? selectedGenres
@@ -43,7 +119,6 @@ export function TasteProvider({ children }) {
         aestheticProfile: aesthetic,
       })
 
-      // Update local storage user profile with updated details
       const storedUser = localStorage.getItem('user')
       if (storedUser) {
         const user = JSON.parse(storedUser)
@@ -54,7 +129,8 @@ export function TasteProvider({ children }) {
       return response.data
     } catch (error) {
       console.error('Failed to sync taste profile with backend:', error)
-      throw error
+      // Do not block flow on legacy auth failure
+      return null
     }
   }
 
@@ -62,10 +138,16 @@ export function TasteProvider({ children }) {
     setSelectedGenres([])
     setSelectedCinemas([])
     setSelectedFilms([])
+    setFavoriteRatings({})
+    setTasteClusters([])
+    setUserTasteProfile(null)
+    setAiSynthesis('')
     setRatings({})
     setWatchlist([])
     setHaventSeen([])
     setAestheticProfile(null)
+    localStorage.removeItem('filmism_taste_clusters')
+    localStorage.removeItem('filmism_ai_synthesis')
   }
 
   return (
@@ -77,6 +159,15 @@ export function TasteProvider({ children }) {
         setSelectedCinemas,
         selectedFilms,
         setSelectedFilms,
+        favoriteRatings,
+        setFavoriteRatings,
+        setFilmRating,
+        tasteClusters,
+        setTasteClusters,
+        userTasteProfile,
+        aiSynthesis,
+        initializeProfile,
+        sessionId,
         ratings,
         setRatings,
         watchlist,
