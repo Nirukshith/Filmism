@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
@@ -37,8 +37,32 @@ const EditIcon = ({ size = 14 }) => (
   </svg>
 )
 
-const SettingsGearIcon = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#ff751f" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+const CameraIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+)
+
+const TrashIcon = ({ size = 13 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+)
+
+const SettingsGearIcon = ({ size = 22 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: 'block', flexShrink: 0 }}
+  >
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
@@ -89,7 +113,7 @@ const Breadcrumb = styled.nav`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.76rem;
   color: #888;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.8rem;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -107,21 +131,36 @@ const Breadcrumb = styled.nav`
 `
 
 const HeaderSection = styled.div`
-  margin-bottom: 1.75rem;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.75rem;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1.5px solid #ddd;
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    align-items: flex-start;
+  }
 `
 
 const PageHeading = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+  font-size: clamp(1.5rem, 2.4vw, 1.95rem);
   font-weight: 700;
   color: #111;
-  margin: 0 0 0.35rem;
+  margin: 0;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
+  line-height: 1.1;
 
   span.icon {
-    font-size: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: #ff751f;
   }
 `
@@ -243,11 +282,15 @@ const HeroBanner = styled.div`
 const HeroAvatarWrapper = styled.div`
   position: relative;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
 `
 
 const HeroAvatar = styled.div`
-  width: 78px;
-  height: 78px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   background: #fff;
   color: #111;
@@ -259,17 +302,81 @@ const HeroAvatar = styled.div`
   justify-content: center;
   border: 3.5px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    border-color: #ff751f;
+    transform: scale(1.02);
+  }
+`
+
+const HeroAvatarImg = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+`
+
+const AvatarOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(2px);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+
+  ${HeroAvatar}:hover & {
+    opacity: 1;
+  }
 `
 
 const OnlineBadge = styled.span`
   position: absolute;
-  bottom: 2px;
-  right: 2px;
+  bottom: 0px;
+  right: 0px;
   width: 16px;
   height: 16px;
   border-radius: 50%;
   background: #10b981;
   border: 2.5px solid #0f172a;
+  z-index: 2;
+`
+
+const RemovePhotoBtn = styled.button`
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.12);
+  }
 `
 
 const HeroDetails = styled.div`
@@ -593,22 +700,72 @@ const OtpNote = styled.p`
   span { color: #ff751f; font-weight: 700; }
 `
 
+// ─── Image Processing Helper ───────────────────────────────────────────────────
+
+const processImageFile = (file) => {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      return reject(new Error('Please select an image file (PNG, JPG, WebP).'))
+    }
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Failed to read image file.'))
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('Failed to parse image data.'))
+      img.onload = () => {
+        const size = 400
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+
+        const minDim = Math.min(img.width, img.height)
+        const sx = (img.width - minDim) / 2
+        const sy = (img.height - minDim) / 2
+
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+        resolve(dataUrl)
+      }
+      img.src = e.target.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 function Settings() {
   const navigate = useNavigate()
-  const { user } = getAuthStatus()
+  const [currentUser, setCurrentUser] = useState(() => getAuthStatus().user)
   const { tasteClusters } = useTasteProfile()
 
   const [activeTab, setActiveTab] = useState('profile') // 'profile' | 'security' | 'taste' | 'danger'
   const [isEditingProfile, setIsEditingProfile] = useState(false)
 
+  // Avatar upload state
+  const [avatarStatus, setAvatarStatus] = useState({ loading: false, error: '' })
+  const fileInputRef = useRef(null)
+
+  // Listen for auth updates from other components
+  useEffect(() => {
+    const handleAuthUpdate = () => {
+      setCurrentUser(getAuthStatus().user)
+    }
+    window.addEventListener('storage', handleAuthUpdate)
+    window.addEventListener('filmism_auth_update', handleAuthUpdate)
+    return () => {
+      window.removeEventListener('storage', handleAuthUpdate)
+      window.removeEventListener('filmism_auth_update', handleAuthUpdate)
+    }
+  }, [])
+
   // Name state
-  const [name, setName] = useState({ firstName: user?.firstName || '', lastName: user?.lastName || '' })
+  const [name, setName] = useState({ firstName: currentUser?.firstName || '', lastName: currentUser?.lastName || '' })
   const [nameStatus, setNameStatus] = useState({ loading: false, error: '', success: '' })
 
   // Email state
-  const [email, setEmail] = useState(user?.email || '')
+  const [email, setEmail] = useState(currentUser?.email || '')
   const [emailStatus, setEmailStatus] = useState({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
   const [emailOtp, setEmailOtp] = useState('')
   const [otpStatus, setOtpStatus] = useState({ loading: false, error: '', success: '' })
@@ -623,9 +780,9 @@ function Settings() {
   const [cinemaStats, setCinemaStats] = useState({ watchlistCount: 0, diaryCount: 0 })
 
   const activePersonasCount = tasteClusters?.length || 0
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Film Enthusiast'
-  const initials = ((user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')).toUpperCase() || 'FP'
-  const userIdentifier = `FILM-${(user?._id || '0000').slice(-4).toUpperCase()}`
+  const fullName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || 'Film Enthusiast'
+  const initials = ((currentUser?.firstName?.[0] || '') + (currentUser?.lastName?.[0] || '')).toUpperCase() || 'FP'
+  const userIdentifier = `FILM-${(currentUser?._id || '0000').slice(-4).toUpperCase()}`
 
   // Fetch summary stats for display
   useEffect(() => {
@@ -644,11 +801,56 @@ function Settings() {
     fetchStats()
   }, [])
 
+  // ── Avatar Upload Handlers ──
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setAvatarStatus({ loading: true, error: '' })
+    try {
+      const dataUrl = await processImageFile(file)
+      const res = await api.patch('/auth/profile', { profilePicture: dataUrl })
+      if (res.data?.token) localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
+      setAvatarStatus({ loading: false, error: '' })
+    } catch (err) {
+      setAvatarStatus({
+        loading: false,
+        error: err.response?.data?.message || err.message || 'Failed to upload photo.',
+      })
+    } finally {
+      if (e.target) e.target.value = ''
+    }
+  }
+
+  const handleRemovePhoto = async () => {
+    setAvatarStatus({ loading: true, error: '' })
+    try {
+      const res = await api.patch('/auth/profile', { profilePicture: null })
+      if (res.data?.token) localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
+      setAvatarStatus({ loading: false, error: '' })
+    } catch (err) {
+      setAvatarStatus({
+        loading: false,
+        error: err.response?.data?.message || 'Failed to remove photo.',
+      })
+    }
+  }
+
   // ── Reset & Close Profile Editor ──
   const handleCloseEditor = () => {
     setIsEditingProfile(false)
-    setName({ firstName: user?.firstName || '', lastName: user?.lastName || '' })
-    setEmail(user?.email || '')
+    setName({ firstName: currentUser?.firstName || '', lastName: currentUser?.lastName || '' })
+    setEmail(currentUser?.email || '')
     setNameStatus({ loading: false, error: '', success: '' })
     setEmailStatus({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
     setEmailOtp('')
@@ -657,7 +859,7 @@ function Settings() {
 
   // ── Cancel Pending Email Change ──
   const handleCancelEmailChange = () => {
-    setEmail(user?.email || '')
+    setEmail(currentUser?.email || '')
     setEmailStatus({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
     setEmailOtp('')
     setOtpStatus({ loading: false, error: '', success: '' })
@@ -674,6 +876,8 @@ function Settings() {
       const res = await api.patch('/auth/profile', { firstName: name.firstName, lastName: name.lastName })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
       setNameStatus({ loading: false, error: '', success: 'Name updated successfully.' })
     } catch (err) {
       setNameStatus({ loading: false, error: err.response?.data?.message || 'Failed to update name.', success: '' })
@@ -686,7 +890,7 @@ function Settings() {
       setEmailStatus({ ...emailStatus, error: 'Enter a valid email address.', success: '' })
       return
     }
-    if (email.toLowerCase() === user?.email) {
+    if (email.toLowerCase() === currentUser?.email) {
       setEmailStatus({ ...emailStatus, error: 'That is already your current email.', success: '' })
       return
     }
@@ -698,6 +902,8 @@ function Settings() {
       } else {
         localStorage.setItem('token', res.data.token)
         localStorage.setItem('user', JSON.stringify(res.data))
+        setCurrentUser(res.data)
+        window.dispatchEvent(new Event('filmism_auth_update'))
         setEmailStatus({ loading: false, error: '', success: 'Email updated.', pendingVerify: false, pendingEmail: '' })
       }
     } catch (err) {
@@ -716,6 +922,8 @@ function Settings() {
       const res = await api.post('/auth/verify-email-change', { otp: emailOtp })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
       setEmailStatus({ loading: false, error: '', success: `Email changed to ${res.data.email}.`, pendingVerify: false, pendingEmail: '' })
       setEmailOtp('')
       setOtpStatus({ loading: false, error: '', success: '' })
@@ -751,6 +959,8 @@ function Settings() {
       const res = await api.patch('/auth/profile', { currentPassword: pwd.current, newPassword: pwd.new })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
       setPwd({ current: '', new: '', confirm: '' })
       setPwdStatus({ loading: false, error: '', success: 'Password changed successfully.' })
     } catch (err) {
@@ -766,6 +976,8 @@ function Settings() {
       if (res.data?.token) {
         localStorage.setItem('token', res.data.token)
         localStorage.setItem('user', JSON.stringify(res.data))
+        setCurrentUser(res.data)
+        window.dispatchEvent(new Event('filmism_auth_update'))
       }
       setResetStatus({ loading: false, error: '', success: 'Taste profile reset. Redirecting to onboarding...' })
       setTimeout(() => {
@@ -830,8 +1042,59 @@ function Settings() {
                 {/* Hero Banner */}
                 <HeroBanner>
                   <HeroAvatarWrapper>
-                    <HeroAvatar>{initials}</HeroAvatar>
-                    <OnlineBadge />
+                    <div style={{ position: 'relative' }}>
+                      <HeroAvatar
+                        id="settings-avatar-btn"
+                        onClick={handleAvatarClick}
+                        title="Click to change profile picture"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAvatarClick() }}
+                      >
+                        {currentUser?.profilePicture ? (
+                          <HeroAvatarImg src={currentUser.profilePicture} alt={fullName} />
+                        ) : (
+                          initials
+                        )}
+                        <AvatarOverlay>
+                          <CameraIcon size={16} />
+                          <span>{currentUser?.profilePicture ? 'Change' : 'Upload'}</span>
+                        </AvatarOverlay>
+                      </HeroAvatar>
+                      <OnlineBadge />
+                    </div>
+
+                    {currentUser?.profilePicture && (
+                      <RemovePhotoBtn
+                        id="remove-photo-btn"
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        disabled={avatarStatus.loading}
+                        title="Remove profile picture"
+                      >
+                        <TrashIcon size={12} /> remove
+                      </RemovePhotoBtn>
+                    )}
+
+                    {avatarStatus.loading && (
+                      <span style={{ fontSize: '0.68rem', color: '#ff751f', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        Updating...
+                      </span>
+                    )}
+                    {avatarStatus.error && (
+                      <span style={{ fontSize: '0.68rem', color: '#dc2626', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        {avatarStatus.error}
+                      </span>
+                    )}
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept="image/png,image/jpeg,image/webp,image/jpg"
+                      style={{ display: 'none' }}
+                      id="profile-picture-input"
+                    />
                   </HeroAvatarWrapper>
                   <HeroDetails>
                     <HeroName>{fullName}</HeroName>
@@ -851,7 +1114,7 @@ function Settings() {
                     </CardHeader>
                     <DataRow>
                       <DataLabel>Email</DataLabel>
-                      <DataValue>{user?.email || 'Not configured'}</DataValue>
+                      <DataValue>{currentUser?.email || 'Not configured'}</DataValue>
                     </DataRow>
                     <DataRow>
                       <DataLabel>Full Name</DataLabel>
@@ -881,8 +1144,8 @@ function Settings() {
                 {/* Quick Actions */}
                 {!isEditingProfile && (
                   <PrimaryEditBtn onClick={() => {
-                    setName({ firstName: user?.firstName || '', lastName: user?.lastName || '' })
-                    setEmail(user?.email || '')
+                    setName({ firstName: currentUser?.firstName || '', lastName: currentUser?.lastName || '' })
+                    setEmail(currentUser?.email || '')
                     setEmailStatus({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
                     setEmailOtp('')
                     setOtpStatus({ loading: false, error: '', success: '' })

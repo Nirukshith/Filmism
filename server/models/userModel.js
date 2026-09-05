@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: false },
     otp: { type: String },
     otpExpiry: { type: Date },
+    profilePicture: { type: String, default: null },
 
 
     // Taste profile — filled in after register

@@ -116,6 +116,7 @@ const verifyOtp = async (req, res) => {
       firstName: user.firstName,
       lastName:  user.lastName,
       email:     user.email,
+      profilePicture: user.profilePicture || null,
       tasteProfileComplete: user.tasteProfileComplete || false,
       token:     generateToken(user._id, user.tasteProfileComplete),
       selectedCinemas: user.selectedCinemas,
@@ -179,6 +180,7 @@ const loginUser = async (req, res) => {
         firstName: user.firstName,
         lastName:  user.lastName,
         email:     user.email,
+        profilePicture: user.profilePicture || null,
         tasteProfileComplete: user.tasteProfileComplete || false,
         token:     generateToken(user._id, user.tasteProfileComplete),
         selectedCinemas: user.selectedCinemas,
@@ -217,6 +219,7 @@ const updateTasteProfile = async (req, res) => {
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
+        profilePicture: updatedUser.profilePicture || null,
         tasteProfileComplete: updatedUser.tasteProfileComplete || false,
         token: generateToken(updatedUser._id, updatedUser.tasteProfileComplete),
         selectedCinemas: updatedUser.selectedCinemas,
@@ -239,12 +242,17 @@ const updateProfile = async (req, res) => {
     const user = await User.findById(req.user._id)
     if (!user) return res.status(404).json({ message: 'User not found' })
 
-    const { firstName, lastName, email, currentPassword, newPassword } = req.body
+    const { firstName, lastName, email, currentPassword, newPassword, profilePicture } = req.body
     let emailChangePending = false
 
     // ── Name update ──────────────────────────────────────
     if (firstName) user.firstName = firstName.trim()
     if (lastName)  user.lastName  = lastName.trim()
+
+    // ── Profile picture update ───────────────────────────
+    if (profilePicture !== undefined) {
+      user.profilePicture = profilePicture
+    }
 
     // ── Email change → stage as pendingEmail + send OTP ──
     const normalizedEmail = email?.toLowerCase().trim()
@@ -281,6 +289,7 @@ const updateProfile = async (req, res) => {
       firstName: updated.firstName,
       lastName: updated.lastName,
       email: updated.email,
+      profilePicture: updated.profilePicture || null,
       tasteProfileComplete: updated.tasteProfileComplete,
       token,
     }
@@ -328,6 +337,7 @@ const verifyEmailChange = async (req, res) => {
       firstName: updated.firstName,
       lastName: updated.lastName,
       email: updated.email,
+      profilePicture: updated.profilePicture || null,
       tasteProfileComplete: updated.tasteProfileComplete,
       token,
     }
@@ -361,6 +371,7 @@ const resetTasteProfile = async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      profilePicture: user.profilePicture || null,
       tasteProfileComplete: false,
       token,
     }

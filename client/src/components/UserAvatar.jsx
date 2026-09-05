@@ -70,7 +70,17 @@ const AvatarBtn = styled.button`
   justify-content: center;
   transition: border-color 0.2s, transform 0.15s;
   flex-shrink: 0;
+  padding: 0;
+  overflow: hidden;
   &:hover { border-color: #ff751f; transform: scale(1.06); }
+`
+
+const AvatarImg = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 `
 
 const Dropdown = styled.div`
@@ -177,13 +187,26 @@ function UserAvatar() {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const navigate = useNavigate()
-  const { user } = getAuthStatus()
+  const [currentUser, setCurrentUser] = useState(() => getAuthStatus().user)
 
-  const firstName = user?.firstName || ''
-  const lastName = user?.lastName || ''
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setCurrentUser(getAuthStatus().user)
+    }
+    window.addEventListener('storage', handleAuthChange)
+    window.addEventListener('filmism_auth_update', handleAuthChange)
+    return () => {
+      window.removeEventListener('storage', handleAuthChange)
+      window.removeEventListener('filmism_auth_update', handleAuthChange)
+    }
+  }, [])
+
+  const firstName = currentUser?.firstName || ''
+  const lastName = currentUser?.lastName || ''
   const initials = ((firstName[0] || '') + (lastName[0] || '')).toUpperCase() || '?'
   const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'User'
-  const email = user?.email || ''
+  const email = currentUser?.email || ''
+  const profilePicture = currentUser?.profilePicture || null
 
   useEffect(() => {
     if (!open) return
@@ -198,6 +221,7 @@ function UserAvatar() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('filmism_is_returning_user')
+    window.dispatchEvent(new Event('filmism_auth_update'))
     navigate('/')
   }
 
@@ -209,7 +233,11 @@ function UserAvatar() {
         aria-label="User menu"
         aria-expanded={open}
       >
-        {initials}
+        {profilePicture ? (
+          <AvatarImg src={profilePicture} alt={fullName} />
+        ) : (
+          initials
+        )}
       </AvatarBtn>
 
       {open && (
