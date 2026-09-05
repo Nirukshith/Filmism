@@ -7,6 +7,8 @@ const {
   recordAction,
   recordOutcome,
   getTelemetryStats,
+  getWatchlist,
+  getDiary,
 } = require('../controllers/recommendationController');
 const { optionalProtect } = require('../middleware/authMiddleware');
 
@@ -27,5 +29,11 @@ router.post('/outcome', optionalProtect, recordOutcome);
 
 // GET /api/recommendations/telemetry-stats (hit-rate quality metrics)
 router.get('/telemetry-stats', optionalProtect, getTelemetryStats);
+
+// GET /api/recommendations/watchlist
+router.get('/watchlist', optionalProtect, getWatchlist);
+
+// GET /api/recommendations/diary
+router.get('/diary', optionalProtect, getDiary);
 
 module.exports = router;

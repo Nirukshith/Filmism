@@ -1,12 +1,27 @@
 const User = require('../models/userModel')
+const UserTasteProfile = require('../models/userTasteProfileModel')
 const jwt  = require('jsonwebtoken')
 const bcrypt = require('bcryptjs') 
 const sendOtpEmail = require('../utils/sendEmail')
 const { mapNamesToIds, mapIdsToNames } = require('../utils/genreMap')         
 
 // Generate JWT token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' })
+const generateToken = (id, tasteProfileComplete = false) => {
+  return jwt.sign({ id, tasteProfileComplete: !!tasteProfileComplete }, process.env.JWT_SECRET, { expiresIn: '30d' })
+}
+
+// Validate password strength: min 8 chars, 1 uppercase, 1 special char
+const validatePasswordStrength = (password) => {
+  if (!password || password.length < 8) {
+    return 'Password must be at least 8 characters long.'
+  }
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must contain at least one uppercase letter.'
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return 'Password must contain at least one special character.'
+  }
+  return null
 }
 
 // ── POST /api/auth/register ──────────────────────────────────────────────────
@@ -17,6 +32,11 @@ const registerUser = async (req, res) => {
     // Check all fields are present
     if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({ message: 'All fields are required' })
+    }
+
+    const passwordError = validatePasswordStrength(password)
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError })
     }
 
     const normalizedEmail = email.toLowerCase().trim()
@@ -40,6 +60,7 @@ const registerUser = async (req, res) => {
       otp: hashedOtp,
       otpExpiry: Date.now() + 5 * 60 * 1000, // 5 min
       isVerified: false,
+      tasteProfileComplete: false,
     })
 
     if (user) {
@@ -48,6 +69,7 @@ const registerUser = async (req, res) => {
       res.status(201).json({
         message: 'Registered successfully. Please verify the OTP sent to your email.',
         email: user.email,
+        tasteProfileComplete: false,
       })
     }
   } catch (error) {
@@ -94,7 +116,8 @@ const verifyOtp = async (req, res) => {
       firstName: user.firstName,
       lastName:  user.lastName,
       email:     user.email,
-      token:     generateToken(user._id),
+      tasteProfileComplete: user.tasteProfileComplete || false,
+      token:     generateToken(user._id, user.tasteProfileComplete),
       selectedCinemas: user.selectedCinemas,
       selectedGenres: mapIdsToNames(user.selectedGenres),
       selectedPosters: user.selectedPosters,
@@ -156,7 +179,8 @@ const loginUser = async (req, res) => {
         firstName: user.firstName,
         lastName:  user.lastName,
         email:     user.email,
-        token:     generateToken(user._id),
+        tasteProfileComplete: user.tasteProfileComplete || false,
+        token:     generateToken(user._id, user.tasteProfileComplete),
         selectedCinemas: user.selectedCinemas,
         selectedGenres: mapIdsToNames(user.selectedGenres),
         selectedPosters: user.selectedPosters,
@@ -182,6 +206,9 @@ const updateTasteProfile = async (req, res) => {
       }
       user.selectedPosters = req.body.selectedPosters || user.selectedPosters
       user.aestheticProfile = req.body.aestheticProfile || user.aestheticProfile
+      if (req.body.tasteProfileComplete !== undefined) {
+        user.tasteProfileComplete = req.body.tasteProfileComplete
+      }
 
       const updatedUser = await user.save()
 
@@ -190,6 +217,8 @@ const updateTasteProfile = async (req, res) => {
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
+        tasteProfileComplete: updatedUser.tasteProfileComplete || false,
+        token: generateToken(updatedUser._id, updatedUser.tasteProfileComplete),
         selectedCinemas: updatedUser.selectedCinemas,
         selectedGenres: mapIdsToNames(updatedUser.selectedGenres),
         selectedPosters: updatedUser.selectedPosters,
@@ -204,4 +233,156 @@ const updateTasteProfile = async (req, res) => {
   }
 }
 
-module.exports = { registerUser, loginUser, updateTasteProfile, verifyOtp, resendOtp}
+// ── PATCH /api/auth/profile ──────────────────────────────────────────────────
+const updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+    if (!user) return res.status(404).json({ message: 'User not found' })
+
+    const { firstName, lastName, email, currentPassword, newPassword } = req.body
+    let emailChangePending = false
+
+    // ── Name update ──────────────────────────────────────
+    if (firstName) user.firstName = firstName.trim()
+    if (lastName)  user.lastName  = lastName.trim()
+
+    // ── Email change → stage as pendingEmail + send OTP ──
+    const normalizedEmail = email?.toLowerCase().trim()
+    if (normalizedEmail && normalizedEmail !== user.email) {
+      const taken = await User.findOne({ email: normalizedEmail })
+      if (taken) return res.status(400).json({ message: 'That email is already in use.' })
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString()
+      user.pendingEmail = normalizedEmail
+      user.otp = await bcrypt.hash(otp, 10)
+      user.otpExpiry = Date.now() + 5 * 60 * 1000
+      await sendOtpEmail(normalizedEmail, otp)
+      emailChangePending = true
+    }
+
+    // ── Password change → verify current password first ──
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: 'Current password is required to set a new one.' })
+      }
+      const match = await bcrypt.compare(currentPassword, user.password)
+      if (!match) return res.status(401).json({ message: 'Current password is incorrect.' })
+      const passwordError = validatePasswordStrength(newPassword)
+      if (passwordError) return res.status(400).json({ message: passwordError })
+      user.password = newPassword  // pre-save hook will hash it
+    }
+
+    const updated = await user.save()
+
+    // Issue fresh token (important after password change)
+    const token = generateToken(updated._id, updated.tasteProfileComplete)
+    const userData = {
+      _id: updated._id,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      email: updated.email,
+      tasteProfileComplete: updated.tasteProfileComplete,
+      token,
+    }
+
+    res.json({
+      ...userData,
+      emailChangePending,
+      pendingEmail: emailChangePending ? updated.pendingEmail : undefined,
+      message: emailChangePending
+        ? 'Profile updated. Check your new email for a verification code.'
+        : 'Profile updated successfully.',
+    })
+  } catch (error) {
+    console.error('UPDATE PROFILE ERROR:', error.message)
+    res.status(500).json({ message: error.message })
+  }
+}
+
+// ── POST /api/auth/verify-email-change ───────────────────────────────────────
+const verifyEmailChange = async (req, res) => {
+  try {
+    const { otp } = req.body
+    const user = await User.findById(req.user._id)
+    if (!user) return res.status(404).json({ message: 'User not found' })
+
+    if (!user.pendingEmail || !user.otp || !user.otpExpiry) {
+      return res.status(400).json({ message: 'No pending email change found.' })
+    }
+    if (user.otpExpiry < Date.now()) {
+      return res.status(400).json({ message: 'OTP has expired. Please request the change again.' })
+    }
+    const match = await bcrypt.compare(otp, user.otp)
+    if (!match) return res.status(400).json({ message: 'Invalid OTP.' })
+
+    // Commit the email change
+    user.email = user.pendingEmail
+    user.pendingEmail = null
+    user.otp = undefined
+    user.otpExpiry = undefined
+    const updated = await user.save()
+
+    const token = generateToken(updated._id, updated.tasteProfileComplete)
+    const userData = {
+      _id: updated._id,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      email: updated.email,
+      tasteProfileComplete: updated.tasteProfileComplete,
+      token,
+    }
+
+    res.json({ ...userData, message: 'Email updated successfully.' })
+  } catch (error) {
+    console.error('VERIFY EMAIL CHANGE ERROR:', error.message)
+    res.status(500).json({ message: error.message })
+  }
+}
+
+// ── POST /api/auth/reset-taste ──────────────────────────────────────────────
+const resetTasteProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+    if (!user) return res.status(404).json({ message: 'User not found' })
+
+    user.tasteProfileComplete = false
+    user.selectedCinemas = []
+    user.selectedGenres = []
+    user.selectedPosters = []
+    user.aestheticProfile = undefined
+    await user.save()
+
+    // Clear user's calculated taste clusters and cached recommendations
+    await UserTasteProfile.deleteMany({ userId: user._id })
+
+    const token = generateToken(user._id, false)
+    const userData = {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      tasteProfileComplete: false,
+      token,
+    }
+
+    res.json({
+      success: true,
+      message: 'Taste profile reset successfully.',
+      ...userData,
+    })
+  } catch (error) {
+    console.error('RESET TASTE ERROR:', error.message)
+    res.status(500).json({ message: error.message })
+  }
+}
+
+module.exports = {
+  registerUser,
+  loginUser,
+  updateTasteProfile,
+  verifyOtp,
+  resendOtp,
+  updateProfile,
+  verifyEmailChange,
+  resetTasteProfile,
+}

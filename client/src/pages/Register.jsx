@@ -318,8 +318,15 @@ function RegisterPage() {
     if (!form.lastName.trim())  newErrors.lastName  = 'required'
     if (!form.email.trim())     newErrors.email     = 'required'
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'invalid email'
-    if (!form.password)         newErrors.password  = 'required'
-    else if (form.password.length < 6) newErrors.password = 'min 6 characters'
+    if (!form.password) {
+      newErrors.password = 'required'
+    } else if (form.password.length < 8) {
+      newErrors.password = 'min 8 characters'
+    } else if (!/[A-Z]/.test(form.password)) {
+      newErrors.password = 'must contain 1 uppercase letter'
+    } else if (!/[^A-Za-z0-9]/.test(form.password)) {
+      newErrors.password = 'must contain 1 special character'
+    }
     if (form.confirmPassword !== form.password) newErrors.confirmPassword = 'passwords do not match'
     return newErrors
   }
@@ -372,6 +379,7 @@ function RegisterPage() {
     if (response.data.token) {
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data))
+      localStorage.removeItem('filmism_is_returning_user')
     }
 
     navigate('/taste')
@@ -478,7 +486,7 @@ function RegisterPage() {
               id="password"
               name="password"
               type="password"
-              placeholder="min. 6 characters"
+              placeholder="min. 8 chars, 1 uppercase, 1 special char"
               value={form.password}
               onChange={handleChange}
             />

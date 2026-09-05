@@ -47,39 +47,50 @@ async function recordRecommendationAction({
     action,
   });
 
-  // 2. Adjust taste profile weights for intent signals (Phase 12)
+  // 2. Adjust taste profile weights and purge film from cached recommendations
   const profile = await UserTasteProfile.findOne(query);
   const actionRate = ACTION_LEARNING_RATES[action];
 
-  if (profile && actionRate && actionRate.centroidPull !== 0) {
-    const cluster = profile.tasteClusters.find((c) => c.clusterId === sourceClusterId) || profile.tasteClusters[0];
+  if (profile) {
+    // Immediately remove from cached recommendations if watchlisted, watched, or dismissed
+    if (['watchlisted', 'watched', 'dismissed'].includes(action) && Array.isArray(profile.cachedRecommendations)) {
+      profile.cachedRecommendations = profile.cachedRecommendations.filter((r) => Number(r.id || r.tmdbId) !== numericId);
+    }
 
-    if (cluster) {
-      // Retrieve movie profile embedding
-      try {
-        const { profile: movieDoc } = await movieProfilingService.getOrProfileMovie(numericId);
-        if (movieDoc?.embedding?.length > 0 && cluster.centroidEmbedding?.length > 0) {
-          const alpha = actionRate.centroidPull * 0.08; // Mild intent learning rate
-          const updatedVec = cluster.centroidEmbedding.map((val, idx) => {
-            return val + alpha * (movieDoc.embedding[idx] || 0);
-          });
-          const norm = Math.sqrt(updatedVec.reduce((sum, v) => sum + v * v, 0)) || 1;
-          cluster.centroidEmbedding = updatedVec.map((v) => Number((v / norm).toFixed(6)));
-        }
+    if (actionRate && actionRate.centroidPull !== 0) {
+      const cluster = profile.tasteClusters.find((c) => c.clusterId === sourceClusterId) || profile.tasteClusters[0];
 
-        // Adjust tag weights
-        const themes = movieDoc?.profile?.themes || [];
-        themes.forEach((t) => {
-          const tag = cluster.topThemes.find((theme) => theme.tag === t);
-          if (tag) {
-            tag.weight = Math.max(0.1, Number((tag.weight + actionRate.tagBoost * 0.1).toFixed(2)));
+      if (cluster) {
+        // Retrieve movie profile embedding
+        try {
+          const { profile: movieDoc } = await movieProfilingService.getOrProfileMovie(numericId);
+          if (movieDoc?.embedding?.length > 0 && cluster.centroidEmbedding?.length > 0) {
+            const alpha = actionRate.centroidPull * 0.08; // Mild intent learning rate
+            const updatedVec = cluster.centroidEmbedding.map((val, idx) => {
+              return val + alpha * (movieDoc.embedding[idx] || 0);
+            });
+            const norm = Math.sqrt(updatedVec.reduce((sum, v) => sum + v * v, 0)) || 1;
+            cluster.centroidEmbedding = updatedVec.map((v) => Number((v / norm).toFixed(6)));
           }
-        });
 
-        await profile.save();
-      } catch (e) {
-        console.warn('Profile update on action warning:', e.message);
+          // Adjust tag weights
+          const themes = movieDoc?.profile?.themes || [];
+          themes.forEach((t) => {
+            const tag = cluster.topThemes.find((theme) => theme.tag === t);
+            if (tag) {
+              tag.weight = Math.max(0.1, Number((tag.weight + actionRate.tagBoost * 0.1).toFixed(2)));
+            }
+          });
+        } catch (e) {
+          console.warn('Profile update on action warning:', e.message);
+        }
       }
+    }
+
+    try {
+      await profile.save();
+    } catch (e) {
+      console.warn('Failed to save profile after action:', e.message);
     }
   }
 
@@ -116,10 +127,14 @@ async function recordPostWatchOutcome({
     { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   );
 
-  // 2. High-impact taste profile update
+  // 2. High-impact taste profile update and cache purge
   const profile = await UserTasteProfile.findOne(query);
 
   if (profile) {
+    if (Array.isArray(profile.cachedRecommendations)) {
+      profile.cachedRecommendations = profile.cachedRecommendations.filter((r) => Number(r.id || r.tmdbId) !== numericId);
+    }
+
     const cluster = profile.tasteClusters.find((c) => c.clusterId === sourceClusterId) || profile.tasteClusters[0];
 
     if (cluster) {

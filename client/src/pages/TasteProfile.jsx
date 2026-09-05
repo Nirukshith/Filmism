@@ -6,6 +6,7 @@ import { CINEMAS } from '../constants/data'
 import api from '../services/api'
 import RatingControl from '../components/RatingControl'
 import TasteClustersView from '../components/TasteClustersView'
+import OriginLandmarkIcon from '../components/OriginLandmarkIcon'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -14,10 +15,21 @@ const GENRES = [
   'Romance', 'Comedy', 'Crime', 'Animation',
   'Documentary', 'Action', 'Mystery', 'War',
   'Historical', 'Fantasy', 'Adventure', 'Musical',
+  'Family', 'Western',
 ]
 
 const MIN_FILMS = 5
 const TARGET_FILMS = 20
+
+const DECADES = [
+  { id: 'all', label: 'All' },
+  { id: '2020s', label: '2020s' },
+  { id: '2010s', label: '2010s' },
+  { id: '2000s', label: '2000s' },
+  { id: '1990s', label: '1990s' },
+  { id: '1980s', label: '1980s' },
+  { id: 'classic', label: 'Classic (Pre-1980)' },
+]
 
 // ─── Styled Components ────────────────────────────────────────────────────────
 
@@ -42,13 +54,14 @@ const Topbar = styled.header`
   @media (max-width: 640px) { padding: 1rem 1.25rem; }
 `
 
-const Logo = styled(Link)`
+const Logo = styled.span`
   font-family: 'kare', 'Playfair Display', Georgia, serif;
   font-size: 1.5rem;
   font-weight: 700;
   color: #111;
-  text-decoration: none;
   letter-spacing: -0.01em;
+  user-select: none;
+  cursor: default;
 `
 
 const StepIndicator = styled.div`
@@ -102,47 +115,62 @@ const StepLine = styled.div`
 
 const PageBody = styled.div`
   flex: 1;
-  padding: 2.5rem 3rem 8rem;
-  max-width: 1000px;
+  display: flex;
+  flex-direction: column;
+  justify-content: ${({ $step }) => ($step === 4 ? 'flex-start' : 'center')};
+  padding: ${({ $step }) => ($step === 4 ? '1.5rem 1.75rem 6.5rem' : '1rem 1.75rem 4.5rem')};
+  max-width: 1380px;
   width: 100%;
   margin: 0 auto;
-  @media (max-width: 768px) { padding: 2rem 1.25rem 8rem; }
+  @media (max-width: 768px) { padding: ${({ $step }) => ($step === 4 ? '1rem 1rem 6.5rem' : '0.85rem 1rem 4.5rem')}; }
+`
+
+const StepContentWrapper = styled.div`
+  width: 100%;
+  max-width: ${({ $wide }) => ($wide ? '1020px' : '780px')};
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 `
 
 const SectionTitle = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-size: clamp(1.75rem, 3.5vw, 2.35rem);
   font-weight: 700;
   color: #111;
-  line-height: 1.1;
-  margin: 0 0 0.5rem;
+  line-height: 1.15;
+  margin: 0 auto 0.35rem;
+  text-align: center;
+  max-width: 680px;
 `
 
 const SectionSub = styled.p`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.9rem;
-  color: #777;
-  margin: 0 auto 2rem;
-  line-height: 1.6;
-  max-width: 580px;
+  font-size: 0.88rem;
+  color: #666;
+  margin: 0 auto 1.1rem;
+  line-height: 1.5;
+  max-width: 540px;
   text-align: center;
 `
 
 const ColTitle = styled.div`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   color: #888;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
 `
 
 const ColCount = styled.span`
-  font-weight: 400;
+  font-weight: 600;
   color: #ff751f;
   text-transform: lowercase;
 `
@@ -151,35 +179,52 @@ const ColCount = styled.span`
 const GenreGrid = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  justify-content: center;
+  gap: 0.75rem 0.85rem;
+  width: 100%;
   margin-bottom: 2rem;
 `
 
 const GenrePill = styled.button`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.88rem;
-  padding: 0.65rem 1.3rem;
+  font-size: 0.9rem;
+  font-weight: ${({ $active }) => ($active ? '700' : '500')};
+  padding: 0.65rem 1.45rem;
   border-radius: 999px;
   border: 1.5px solid ${({ $active }) => ($active ? '#ff751f' : '#ccc')};
-  background: ${({ $active }) => ($active ? '#ff751f' : 'transparent')};
-  color: ${({ $active }) => ($active ? '#fff' : '#444')};
+  background: ${({ $active }) => ($active ? '#ff751f' : '#fff')};
+  color: ${({ $active }) => ($active ? '#fff' : '#333')};
   cursor: pointer;
   text-transform: lowercase;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: ${({ $active }) => ($active ? '0 4px 14px rgba(255, 117, 31, 0.25)' : '0 2px 6px rgba(0,0,0,0.02)')};
+
   &:hover {
     border-color: #ff751f;
     color: ${({ $active }) => ($active ? '#fff' : '#ff751f')};
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 117, 31, 0.15);
   }
 `
 
 // ── Step 2: Cinemas ──
 const CinemaGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.85rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem 0.9rem;
+  width: 100%;
+  margin-bottom: 1.5rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
 `
 
 const CinemaCard = styled.div`
@@ -190,26 +235,36 @@ const CinemaCard = styled.div`
   cursor: pointer;
   display: flex;
   align-items: center;
-  padding: 0.85rem 1rem;
-  gap: 0.85rem;
-  transition: all 0.2s;
+  padding: 0.75rem 0.95rem;
+  gap: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: ${({ $active }) => ($active ? '0 4px 14px rgba(255, 117, 31, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)')};
+
   &:hover {
     border-color: #ff751f;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
   }
 `
 
-const CinemaImg = styled.div`
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, ${({ $c1 }) => $c1}, ${({ $c2 }) => $c2});
+const CinemaIconBadge = styled.div`
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: ${({ $tint, $activeBg, $selected }) =>
+    $selected ? ($activeBg || 'rgba(255, 117, 31, 0.18)') : ($tint || 'rgba(0, 0, 0, 0.05)')};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ $accent }) => $accent || '#111'};
   flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 `
 
 const CinemaLabel = styled.div`
   flex: 1;
+  display: flex;
+  align-items: center;
 `
 
 const CinemaName = styled.div`
@@ -218,12 +273,6 @@ const CinemaName = styled.div`
   font-weight: 700;
   color: #111;
   line-height: 1.2;
-`
-
-const CinemaCount = styled.div`
-  font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.7rem;
-  color: #999;
 `
 
 const CinemaCheck = styled.div`
@@ -244,9 +293,9 @@ const CinemaCheck = styled.div`
 const SignalMeterWrap = styled.div`
   background: #fff;
   border: 1.5px solid #e0e0e0;
-  border-radius: 14px;
-  padding: 1.1rem 1.4rem;
-  margin-bottom: 2rem;
+  border-radius: 10px;
+  padding: 0.75rem 1.1rem;
+  margin-bottom: 1rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 `
 
@@ -254,13 +303,13 @@ const SignalHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
   gap: 1rem;
 `
 
 const SignalTitle = styled.div`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #222;
   text-transform: uppercase;
@@ -269,14 +318,14 @@ const SignalTitle = styled.div`
 
 const SignalStatus = styled.div`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: ${({ $level }) => ($level === 'high' ? '#2e7d32' : $level === 'good' ? '#ff751f' : '#888')};
 `
 
 const SignalTrack = styled.div`
   width: 100%;
-  height: 8px;
+  height: 6px;
   background: #eee;
   border-radius: 999px;
   overflow: hidden;
@@ -294,9 +343,9 @@ const SignalFill = styled.div`
 const SignalLegend = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-top: 0.4rem;
+  margin-top: 0.3rem;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: #999;
 `
 
@@ -305,47 +354,83 @@ const FiltersActive = styled.div`
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
 `
 
 const FilterLabel = styled.span`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: #999;
 `
 
 const FilterTag = styled.span`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   background: #e4e4e4;
   color: #333;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: 999px;
   font-weight: 500;
 `
 
+const DecadeFilterRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+`
+
+const DecadeLabel = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.72rem;
+  color: #888;
+  font-weight: 500;
+  margin-right: 0.2rem;
+`
+
+const DecadePill = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.75rem;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1.5px solid ${({ $active }) => ($active ? '#ff751f' : '#ddd')};
+  background: ${({ $active }) => ($active ? '#ff751f' : '#fff')};
+  color: ${({ $active }) => ($active ? '#fff' : '#444')};
+  font-weight: ${({ $active }) => ($active ? '600' : '400')};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+
+  &:hover {
+    border-color: #ff751f;
+    color: ${({ $active }) => ($active ? '#fff' : '#ff751f')};
+    background: ${({ $active }) => ($active ? '#ff751f' : '#fff9f5')};
+  }
+`
+
 const SearchWrap = styled.div`
   position: relative;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.9rem;
 `
 
 const SearchIcon = styled.span`
   position: absolute;
-  left: 1rem;
+  left: 0.9rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: #888;
 `
 
 const SearchInput = styled.input`
   width: 100%;
-  padding: 0.8rem 1rem 0.8rem 2.8rem;
+  padding: 0.65rem 0.9rem 0.65rem 2.5rem;
   background: #fff;
   border: 1.5px solid #ddd;
   border-radius: 8px;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #111;
   outline: none;
   transition: border-color 0.2s;
@@ -375,15 +460,28 @@ const ClearSearchBtn = styled.button`
 
 const FilmGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.85rem;
   margin-bottom: 2rem;
+
+  @media (max-width: 1280px) {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 `
 
 const FilmCard = styled.div`
   background: #fff;
   border: 1.5px solid ${({ $selected }) => ($selected ? '#ff751f' : '#ddd')};
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   position: relative;
@@ -400,7 +498,7 @@ const FilmCard = styled.div`
 
 const FilmPoster = styled.div`
   width: 100%;
-  height: 120px;
+  aspect-ratio: 2 / 3;
   background: ${({ $posterPath, $c1, $c2 }) =>
     $posterPath
       ? `url(https://image.tmdb.org/t/p/w500${$posterPath}) center / cover no-repeat`
@@ -421,30 +519,30 @@ const FilmOverlay = styled.div`
 `
 
 const FilmCheck = styled.div`
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   background: #ff751f;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   color: #fff;
   font-weight: 700;
 `
 
 const FilmInfo = styled.div`
-  padding: 10px;
+  padding: 6px 8px;
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
 `
 
 const FilmTitle = styled.div`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #111;
   line-height: 1.2;
@@ -455,8 +553,11 @@ const FilmTitle = styled.div`
 
 const FilmMeta = styled.div`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: #777;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 const RatingWrap = styled.div`
@@ -718,6 +819,8 @@ const DEFAULT_GENRE_MAP = {
   'Adventure': 12,
   'Musical': 10402,
   'Music': 10402,
+  'Family': 10751,
+  'Western': 37,
 }
 
 function TasteProfile() {
@@ -734,16 +837,18 @@ function TasteProfile() {
     setFavoriteRatings,
     setFilmRating,
     initializeProfile,
+    appendProfileFavorites,
     tasteClusters,
     aiSynthesis,
     userTasteProfile,
+    clearProfile,
   } = useTasteProfile()
 
-  const [step, setStep]       = useState(1)
-  const [search, setSearch]   = useState('')
+  const [step, setStep] = useState(1)
+  const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
-  const [isSearching, setIsSearching]     = useState(false)
-  const [filmCache, setFilmCache]         = useState(() => {
+  const [isSearching, setIsSearching] = useState(false)
+  const [filmCache, setFilmCache] = useState(() => {
     try {
       const stored = localStorage.getItem('filmism_film_cache')
       return stored ? JSON.parse(stored) : {}
@@ -753,18 +858,19 @@ function TasteProfile() {
   })
   const [loading, setLoading] = useState(false)
   const [loadingText, setLoadingText] = useState('Analyzing cinema choices...')
-  const [filteredFilms, setFilteredFilms]   = useState([])
-  const [genreMap, setGenreMap]     = useState(DEFAULT_GENRE_MAP)
+  const [filteredFilms, setFilteredFilms] = useState([])
+  const [genreMap, setGenreMap] = useState(DEFAULT_GENRE_MAP)
   const [originsMap, setOriginsMap] = useState({})
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages]   = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [selectedDecade, setSelectedDecade] = useState('all')
 
   // Persist filmCache to localStorage
   useEffect(() => {
     if (filmCache && Object.keys(filmCache).length > 0) {
       try {
         localStorage.setItem('filmism_film_cache', JSON.stringify(filmCache))
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [filmCache])
 
@@ -814,22 +920,14 @@ function TasteProfile() {
     }
   }, [selectedFilms])
 
-  // Handle recalibration entry points from query parameters
+  // Handle continue entry point from query parameters
   useEffect(() => {
-    const recalibrate = searchParams.get('recalibrate') || searchParams.get('mode')
-    if (recalibrate === 'favourites' || recalibrate === 'films' || recalibrate === '3') {
-      // 1. Recalibrate Favourites: Genres and Origins remain intact; user edits films.
+    const mode = searchParams.get('mode')
+    if (mode === 'continue') {
       setStep(3)
-    } else if (recalibrate === 'origins' || recalibrate === 'cinemas' || recalibrate === '2') {
-      // 2. Recalibrate Origins: Genres remain intact; selected films are cleared.
-      setSelectedFilms([])
-      setFavoriteRatings({})
-      setStep(2)
-    } else if (recalibrate === 'genres' || recalibrate === '1') {
-      // 3. Recalibrate Genres: Origins and selected films are cleared.
-      setSelectedCinemas([])
-      setSelectedFilms([])
-      setFavoriteRatings({})
+    } else if (mode === 'new_guest') {
+      clearProfile()
+      setFilmCache({})
       setStep(1)
     }
   }, [searchParams])
@@ -960,6 +1058,7 @@ function TasteProfile() {
           params: {
             with_genres: genreIds || undefined,
             with_origin_country: countryCodes || undefined,
+            decade: selectedDecade !== 'all' ? selectedDecade : undefined,
             page: currentPage,
           },
         })
@@ -1015,11 +1114,11 @@ function TasteProfile() {
     if (selectedGenres.length > 0 || selectedCinemas.length > 0) {
       fetchMovies()
     }
-  }, [selectedGenres, selectedCinemas, genreMap, originsMap, currentPage])
+  }, [selectedGenres, selectedCinemas, genreMap, originsMap, currentPage, selectedDecade])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedGenres, selectedCinemas])
+  }, [selectedGenres, selectedCinemas, selectedDecade])
 
   const toggleGenre = (g) => {
     // If genres are changed: already selected origins and favourite films will be reset
@@ -1056,9 +1155,10 @@ function TasteProfile() {
 
   const selectedFilmObjs = selectedFilms.map(id => filmCache[id] || { id, title: `Film #${id}`, genres: [] })
 
-  const canStep2  = selectedGenres.length  > 0
-  const canStep3  = selectedCinemas.length > 0
-  const canFinish = selectedFilms.length  >= MIN_FILMS
+  const isContinueMode = searchParams.get('mode') === 'continue'
+  const canStep2 = selectedGenres.length > 0
+  const canStep3 = selectedCinemas.length > 0
+  const canFinish = selectedFilms.length >= MIN_FILMS || (isContinueMode && selectedFilms.length > 0)
 
   const handleStepClick = (targetStep) => {
     if (targetStep === 1) {
@@ -1079,21 +1179,36 @@ function TasteProfile() {
       setStep(3)
     } else if (step === 3) {
       setLoading(true)
-      setLoadingText('Profiling cinema craftsmanship & discovering taste clusters with AI...')
-      try {
-        await initializeProfile({
-          genres: selectedGenres,
-          origins: selectedCinemas,
-          films: selectedFilms,
-          ratingsMap: favoriteRatings,
-        })
-        setStep(4)
-      } catch (err) {
-        console.error('Failed to build taste profile:', err)
-        // Advance to step 4 anyway with available clusters
-        setStep(4)
-      } finally {
-        setLoading(false)
+      if (isContinueMode && typeof appendProfileFavorites === 'function') {
+        setLoadingText('Incorporating new films into your taste clusters...')
+        try {
+          await appendProfileFavorites({
+            films: selectedFilms,
+            ratingsMap: favoriteRatings,
+          })
+          setStep(4)
+        } catch (err) {
+          console.error('Failed to append taste profile:', err)
+          setStep(4)
+        } finally {
+          setLoading(false)
+        }
+      } else {
+        setLoadingText('Profiling cinema craftsmanship & discovering taste clusters with AI...')
+        try {
+          await initializeProfile({
+            genres: selectedGenres,
+            origins: selectedCinemas,
+            films: selectedFilms,
+            ratingsMap: favoriteRatings,
+          })
+          setStep(4)
+        } catch (err) {
+          console.error('Failed to build taste profile:', err)
+          setStep(4)
+        } finally {
+          setLoading(false)
+        }
       }
     } else if (step === 4) {
       navigate('/recommend')
@@ -1102,7 +1217,7 @@ function TasteProfile() {
 
   const STEPS = [
     { num: 1, label: 'genres' },
-    { num: 2, label: 'cinemas' },
+    { num: 2, label: 'origins' },
     { num: 3, label: 'films' },
     { num: 4, label: 'clusters' },
   ]
@@ -1132,7 +1247,7 @@ function TasteProfile() {
 
       <PageWrapper>
         <Topbar>
-          <Logo to="/">Filmism</Logo>
+          <Logo>Filmism</Logo>
           <StepIndicator>
             {STEPS.map((s, i) => {
               const clickable = isStepClickable(s.num)
@@ -1155,18 +1270,18 @@ function TasteProfile() {
           </StepIndicator>
         </Topbar>
 
-        <PageBody>
+        <PageBody $step={step}>
 
           {/* ══ STEP 1: Genres ══ */}
           {step === 1 && (
-            <>
+            <StepContentWrapper>
               <SectionTitle>What genres do<br />you love?</SectionTitle>
               <SectionSub>
                 Pick the genres that excite you. We'll use these to uncover
                 films tailored to your cinematic sensibility.
               </SectionSub>
               <ColTitle>
-                Select genres
+                <span>Select genres</span>
                 <ColCount>
                   {selectedGenres.length > 0 ? `${selectedGenres.length} selected` : 'none yet'}
                 </ColCount>
@@ -1178,19 +1293,19 @@ function TasteProfile() {
                   </GenrePill>
                 ))}
               </GenreGrid>
-            </>
+            </StepContentWrapper>
           )}
 
-          {/* ══ STEP 2: Cinemas ══ */}
+          {/* ══ STEP 2: Origins ══ */}
           {step === 2 && (
-            <>
-              <SectionTitle>Which cinema worlds<br />interest you?</SectionTitle>
+            <StepContentWrapper $wide>
+              <SectionTitle>Which cinema origins<br />interest you?</SectionTitle>
               <SectionSub>
                 Pick the film traditions you're drawn to. We'll find cinema from
                 these origins that matches your taste.
               </SectionSub>
               <ColTitle>
-                Cinema origins
+                <span>Cinema origins</span>
                 <ColCount>
                   {selectedCinemas.length > 0 ? `${selectedCinemas.length} selected` : 'none yet'}
                 </ColCount>
@@ -1202,21 +1317,42 @@ function TasteProfile() {
                     $active={selectedCinemas.includes(c.id)}
                     onClick={() => toggleCinema(c.id)}
                   >
-                    <CinemaImg $c1={c.c1} $c2={c.c2} />
+                    <CinemaIconBadge
+                      $tint={c.tint}
+                      $activeBg={c.activeBg}
+                      $accent={c.accent}
+                      $selected={selectedCinemas.includes(c.id)}
+                    >
+                      <OriginLandmarkIcon id={c.id} name={c.name} color={c.accent} size={20} />
+                    </CinemaIconBadge>
                     <CinemaLabel>
                       <CinemaName>{c.name}</CinemaName>
-                      <CinemaCount>{c.count}</CinemaCount>
                     </CinemaLabel>
                     <CinemaCheck $active={selectedCinemas.includes(c.id)}>✓</CinemaCheck>
                   </CinemaCard>
                 ))}
               </CinemaGrid>
-            </>
+            </StepContentWrapper>
           )}
 
           {/* ══ STEP 3: Film Selection ══ */}
           {step === 3 && (
             <>
+              {isContinueMode && (
+                <div style={{
+                  background: 'rgba(255, 117, 31, 0.08)',
+                  border: '1.5px solid rgba(255, 117, 31, 0.3)',
+                  borderRadius: '10px',
+                  padding: '0.85rem 1.25rem',
+                  marginBottom: '1.25rem',
+                  fontFamily: 'Lexend Deca, sans-serif',
+                  fontSize: '0.85rem',
+                  color: '#333',
+                  lineHeight: '1.5'
+                }}>
+                  <strong style={{ color: '#ff751f' }}>✦ Deepen Your Taste Profile:</strong> Select and rate additional favorite films below. They will be incrementally merged into your active taste personas without resetting your genres, origins, or existing favorites.
+                </div>
+              )}
               <SectionTitle>Pick your<br />favourite films.</SectionTitle>
               <SectionSub>
                 Select films you love and rate how much they represent your taste.
@@ -1231,8 +1367,8 @@ function TasteProfile() {
                     {signalLevel === 'high'
                       ? '✦ High Precision Taste Signal'
                       : signalLevel === 'good'
-                      ? `✓ Initial Signal Ready (${selectedFilms.length} films selected)`
-                      : `${selectedFilms.length}/${MIN_FILMS} minimum to unlock profile`}
+                        ? `✓ Initial Signal Ready (${selectedFilms.length} films selected)`
+                        : `${selectedFilms.length}/${MIN_FILMS} minimum to unlock profile`}
                   </SignalStatus>
                 </SignalHeader>
                 <SignalTrack>
@@ -1258,11 +1394,27 @@ function TasteProfile() {
                 </FiltersActive>
               )}
 
+              {/* Decade / Era Filter */}
+              {!search.trim() && (
+                <DecadeFilterRow>
+                  <DecadeLabel>era:</DecadeLabel>
+                  {DECADES.map((d) => (
+                    <DecadePill
+                      key={d.id}
+                      $active={selectedDecade === d.id}
+                      onClick={() => setSelectedDecade(d.id)}
+                    >
+                      {d.label}
+                    </DecadePill>
+                  ))}
+                </DecadeFilterRow>
+              )}
+
               <SearchWrap>
                 <SearchIcon>⌕</SearchIcon>
                 <SearchInput
                   type="text"
-                  placeholder="search any film in entire database (e.g. Inception, La La Land)..."
+                  placeholder="search any film in your favourite genre and origin.."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -1342,6 +1494,7 @@ function TasteProfile() {
                                 value={ratingVal}
                                 onChange={(val) => setFilmRating(f.id, val)}
                                 showHaventWatched={false}
+                                compact={true}
                               />
                             </RatingWrap>
                           )}
@@ -1440,8 +1593,8 @@ function TasteProfile() {
           )}
           {step === 2 && (
             selectedCinemas.length > 0
-              ? <><span>{selectedCinemas.length} cinemas</span> selected</>
-              : 'select at least one cinema to continue'
+              ? <><span>{selectedCinemas.length} origins</span> selected</>
+              : 'select at least one origin to continue'
           )}
           {step === 3 && (
             canFinish
@@ -1463,7 +1616,7 @@ function TasteProfile() {
             }
             onClick={handleNext}
           >
-            {loading ? 'building...' : step === 3 ? 'build taste clusters →' : step === 4 ? 'explore candidates →' : 'continue →'}
+            {loading ? 'building...' : step === 3 ? (isContinueMode ? 'update taste clusters →' : 'build taste clusters →') : step === 4 ? 'explore candidates →' : 'continue →'}
           </NextBtn>
         </BtnRow>
       </BottomBar>

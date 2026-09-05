@@ -2,6 +2,8 @@ const candidatePoolService = require('../services/candidatePoolService');
 const recommendationEngine = require('../services/recommendationEngine');
 const feedbackService = require('../services/feedbackService');
 const UserTasteProfile = require('../models/userTasteProfileModel');
+const RecommendationLog = require('../models/recommendationLogModel');
+const tmdb = require('../services/tmdbService');
 
 /**
  * POST /api/recommendations/candidates
@@ -77,6 +79,8 @@ const getRankedRecommendations = async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 12;
 
+    const refresh = req.query.refresh === 'true' || req.query.forceRefresh === 'true';
+
     const query = userId ? { userId } : { sessionId };
     const profile = await UserTasteProfile.findOne(query).sort({ updatedAt: -1 });
 
@@ -87,7 +91,7 @@ const getRankedRecommendations = async (req, res) => {
       });
     }
 
-    const recommendations = await recommendationEngine.generateRankedRecommendations(profile, { page, limit });
+    const recommendations = await recommendationEngine.generateRankedRecommendations(profile, { page, limit, refresh });
 
     res.json({
       success: true,
@@ -186,6 +190,134 @@ const getTelemetryStats = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/recommendations/watchlist
+ * Return all films the user has watchlisted, enriched with TMDB poster data.
+ */
+const getWatchlist = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const sessionId = req.query.sessionId;
+    const query = userId ? { userId } : { sessionId };
+
+    // Fetch all watchlisted logs, deduplicated by tmdbId (keep latest)
+    const logs = await RecommendationLog.find({ ...query, action: 'watchlisted' })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Deduplicate — keep only the most recent entry per tmdbId
+    const seen = new Set();
+    const unique = logs.filter((l) => {
+      if (seen.has(l.tmdbId)) return false;
+      seen.add(l.tmdbId);
+      return true;
+    });
+
+    if (unique.length === 0) {
+      return res.json({ success: true, watchlist: [] });
+    }
+
+    // Enrich with TMDB poster + year via batch fetch
+    const enriched = await Promise.allSettled(
+      unique.map(async (log) => {
+        try {
+          const { data } = await tmdb.get(`/movie/${log.tmdbId}`);
+          return {
+            tmdbId: log.tmdbId,
+            title: data.title || log.title,
+            year: data.release_date ? parseInt(data.release_date.split('-')[0]) : null,
+            genres: (data.genres || []).map((g) => g.name).slice(0, 3),
+            poster_path: data.poster_path || null,
+            matchScore: log.matchScore,
+            sourceClusterName: log.sourceClusterName,
+            addedAt: log.createdAt,
+          };
+        } catch {
+          return {
+            tmdbId: log.tmdbId,
+            title: log.title,
+            year: null,
+            genres: [],
+            poster_path: null,
+            matchScore: log.matchScore,
+            sourceClusterName: log.sourceClusterName,
+            addedAt: log.createdAt,
+          };
+        }
+      })
+    );
+
+    const watchlist = enriched
+      .filter((r) => r.status === 'fulfilled')
+      .map((r) => r.value);
+
+    res.json({ success: true, watchlist });
+  } catch (error) {
+    console.error('Error fetching watchlist:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/recommendations/diary
+ * Return all films the user has marked as watched, with rating + TMDB poster data.
+ */
+const getDiary = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const sessionId = req.query.sessionId;
+    const query = userId ? { userId } : { sessionId };
+
+    const logs = await RecommendationLog.find({ ...query, action: 'watched' })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (logs.length === 0) return res.json({ success: true, diary: [] });
+
+    const enriched = await Promise.allSettled(
+      logs.map(async (log) => {
+        try {
+          const { data } = await tmdb.get(`/movie/${log.tmdbId}`);
+          return {
+            tmdbId: log.tmdbId,
+            title: data.title || log.title,
+            year: data.release_date ? parseInt(data.release_date.split('-')[0]) : null,
+            genres: (data.genres || []).map((g) => g.name).slice(0, 3),
+            poster_path: data.poster_path || null,
+            outcomeRating: log.outcomeRating,
+            outcomeLabel: log.outcomeLabel,
+            matchScore: log.matchScore,
+            sourceClusterName: log.sourceClusterName,
+            watchedAt: log.createdAt,
+          };
+        } catch {
+          return {
+            tmdbId: log.tmdbId,
+            title: log.title,
+            year: null,
+            genres: [],
+            poster_path: null,
+            outcomeRating: log.outcomeRating,
+            outcomeLabel: log.outcomeLabel,
+            matchScore: log.matchScore,
+            sourceClusterName: log.sourceClusterName,
+            watchedAt: log.createdAt,
+          };
+        }
+      })
+    );
+
+    const diary = enriched
+      .filter((r) => r.status === 'fulfilled')
+      .map((r) => r.value);
+
+    res.json({ success: true, diary });
+  } catch (error) {
+    console.error('Error fetching diary:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getCandidatePool,
   rateCandidateFilm,
@@ -193,4 +325,6 @@ module.exports = {
   recordAction,
   recordOutcome,
   getTelemetryStats,
+  getWatchlist,
+  getDiary,
 };

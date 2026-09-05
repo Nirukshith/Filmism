@@ -181,10 +181,10 @@ const SubmitBtn = styled.button`
 `;
 
 const OUTCOME_TIERS = [
-  { value: 4, label: 'great', symbol: '✦', desc: 'Loved it, peak cinema', color: '#2e7d32', bg: 'rgba(46,125,50,0.1)' },
+  { value: 4, label: 'great', symbol: '♥', desc: 'Loved it, peak cinema', color: '#e05353', bg: 'rgba(224,83,83,0.1)' },
   { value: 3, label: 'good', symbol: '★', desc: 'Enjoyable, worth the time', color: '#ff9800', bg: 'rgba(255,152,0,0.1)' },
-  { value: 2, label: 'okay', symbol: '∼', desc: 'Mixed feelings, passable', color: '#757575', bg: 'rgba(117,117,117,0.1)' },
-  { value: 1, label: 'not for me', symbol: '✕', desc: 'Did not click at all', color: '#e05353', bg: 'rgba(224,83,83,0.1)' },
+  { value: 2, label: 'okay', symbol: '—', desc: 'Mixed feelings, passable', color: '#757575', bg: 'rgba(117,117,117,0.1)' },
+  { value: 1, label: 'not for me', symbol: '✕', desc: 'Did not click at all', color: '#888', bg: 'rgba(136,136,136,0.1)' },
 ];
 
 export default function PostWatchModal({ movie, onClose, onSubmit }) {

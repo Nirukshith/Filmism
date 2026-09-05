@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import ryanImage from '../assets/ryan.png'
 import emmaImage from '../assets/emma.png'
 
@@ -125,28 +125,55 @@ const Subtitle = styled.p`
 `
 
 const Cta = styled(Link)`
-  display: inline-block;
-  padding: 0.8rem 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.6rem;
   border: 2px solid #111;
   color: #111;
   text-decoration: none;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.92rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  background: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2.2rem);
+  transition: all 0.2s ease;
 
   &:hover {
     background: #111;
     color: #fff;
+    transform: translateY(-2.35rem) scale(1.03);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   }
 `
 
 function LandingPage() {
+  const navigate = useNavigate()
+
+  const handleTryAsGuest = (e) => {
+    e.preventDefault()
+    // Reset guest session, log out existing user if any, and clean taste state
+    const newGuestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.setItem('filmism_session_id', newGuestId)
+    localStorage.removeItem('filmism_taste_clusters')
+    localStorage.removeItem('filmism_ai_synthesis')
+    localStorage.removeItem('filmism_film_cache')
+    localStorage.removeItem('filmism_is_returning_user')
+    navigate('/taste?mode=new_guest')
+  }
+
   return (
     <PageWrapper>
       <Nav aria-label="Main navigation">
+        <NavLink to="/taste?mode=new_guest" onClick={handleTryAsGuest}>try as guest</NavLink>
         <NavLink to="/login">log in</NavLink>
         <NavLink to="/register">create account</NavLink>
-        <NavLink to="/about">about</NavLink>
       </Nav>
 
       <HeroSplit>

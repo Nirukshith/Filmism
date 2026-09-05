@@ -3,10 +3,27 @@ const OpenAI = require('openai');
 
 const GEMINI_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
 const OPENAI_KEY = (process.env.OPENAI_API_KEY || '').trim();
+const OPENROUTER_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
 
 // Initialize clients if keys exist
 let geminiClient = null;
 let openaiClient = null;
+let openrouterClient = null;
+
+if (OPENROUTER_KEY) {
+  try {
+    openrouterClient = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: OPENROUTER_KEY,
+      defaultHeaders: {
+        'HTTP-Referer': 'https://filmism.app',
+        'X-Title': 'Filmism',
+      },
+    });
+  } catch (err) {
+    console.warn('OpenRouter initialization warning:', err.message);
+  }
+}
 
 if (GEMINI_KEY) {
   try {
@@ -26,54 +43,147 @@ if (OPENAI_KEY) {
 
 /**
  * Fallback heuristic profiling for offline development or missing API keys.
+ * Uses fine-grained cinematic taxonomy across genres, TMDB keywords, and directors.
  */
 function generateHeuristicProfile(movieData) {
   const overview = (movieData.overview || '').toLowerCase();
-  const title = movieData.title || '';
+  const title = (movieData.title || '').toLowerCase();
   const genres = (movieData.genres || []).map((g) => (typeof g === 'string' ? g : g.name || ''));
-  const keywords = (movieData.keywords || []).map((k) => (typeof k === 'string' ? k : k.name || ''));
+  const keywords = (movieData.keywords || []).map((k) => (typeof k === 'string' ? k.toLowerCase() : (k.name || '').toLowerCase()));
+  const director = movieData.director || '';
 
   const themes = [];
   const mood = [];
   const narrativeStyle = [];
   const visualAesthetic = [];
 
-  if (overview.includes('kill') || overview.includes('murder') || overview.includes('detective') || genres.includes('Crime')) {
-    themes.push('moral ambiguity', 'crime & justice');
-    mood.push('tense', 'suspenseful');
-    narrativeStyle.push('investigative');
-    visualAesthetic.push('neo-noir shadowplay');
-  }
-  if (genres.includes('Science Fiction') || overview.includes('future') || overview.includes('alien')) {
-    themes.push('existential curiosity', 'technological impact');
-    mood.push('contemplative', 'mysterious');
-    visualAesthetic.push('speculative worldbuilding');
-  }
-  if (genres.includes('Drama') || overview.includes('family') || overview.includes('relationship')) {
-    themes.push('human connection', 'identity & loss');
-    mood.push('melancholic', 'empathetic');
-  }
-  if (genres.includes('Comedy') || overview.includes('humor')) {
-    mood.push('playful', 'witty');
-    narrativeStyle.push('character-driven');
+  // 1. Genre-driven cinematic attributes
+  if (genres.includes('Science Fiction')) {
+    if (keywords.some((k) => k.includes('dystopi') || k.includes('cyberpunk') || k.includes('ai') || k.includes('robot'))) {
+      themes.push('technological alienation', 'cybernetic identity', 'synthetic consciousness');
+      mood.push('dystopian', 'cold', 'philosophical');
+      visualAesthetic.push('neon-drenched cyberpunk', 'industrial brutalism');
+    } else if (keywords.some((k) => k.includes('space') || k.includes('alien') || k.includes('cosmic') || k.includes('time travel'))) {
+      themes.push('existential curiosity', 'cosmic insignificance', 'temporal paradox');
+      mood.push('awe-inspiring', 'contemplative', 'mysterious');
+      visualAesthetic.push('monumental scale', 'sterile retro-futurism');
+    } else {
+      themes.push('speculative ethics', 'existential inquiry');
+      mood.push('contemplative', 'cerebral');
+      visualAesthetic.push('clean futurism');
+    }
+    narrativeStyle.push('high-concept speculative');
   }
 
-  // Ensure non-empty arrays
-  if (themes.length === 0) themes.push('identity & human condition', 'struggle for meaning');
-  if (mood.length === 0) mood.push('atmospheric', 'engaging');
-  if (narrativeStyle.length === 0) narrativeStyle.push('linear progression', 'focused perspective');
-  if (visualAesthetic.length === 0) visualAesthetic.push('grounded naturalism');
+  if (genres.includes('Crime') || genres.includes('Mystery')) {
+    themes.push('moral ambiguity', 'corruption & justice', 'obsessive investigation');
+    mood.push('tense', 'suspenseful', 'cynical');
+    narrativeStyle.push('slow-burn investigative', 'unfolding mystery');
+    visualAesthetic.push('neo-noir shadowplay', 'atmospheric rain-slicked grain');
+  }
+
+  if (genres.includes('Thriller')) {
+    themes.push('psychological paranoia', 'survival instinct', 'deception');
+    mood.push('claustrophobic', 'pulse-pounding', 'foreboding');
+    narrativeStyle.push('taut suspense', 'ticking-clock tension');
+  }
+
+  if (genres.includes('Horror')) {
+    if (keywords.some((k) => k.includes('psychological') || k.includes('cult') || k.includes('grief') || k.includes('madness'))) {
+      themes.push('psychological unraveling', 'generational trauma', 'existential dread');
+      mood.push('unsettling', 'haunting', 'macabre');
+      visualAesthetic.push('disturbing dreamscape', 'claustrophobic lighting');
+    } else {
+      themes.push('supernatural terror', 'survival against the unknown');
+      mood.push('visceral', 'nightmarish', 'ominous');
+      visualAesthetic.push('high-contrast shadows', 'gothic decay');
+    }
+    narrativeStyle.push('atmospheric slow-burn dread');
+  }
+
+  if (genres.includes('Romance')) {
+    if (genres.includes('Comedy')) {
+      themes.push('playful banter', 'serendipity & romantic chemistry', 'misunderstandings');
+      mood.push('whimsical', 'warm', 'effervescent');
+      narrativeStyle.push('witty dialogue-driven', 'charming ensemble');
+      visualAesthetic.push('vibrant saturated palette', 'golden hour glow');
+    } else {
+      themes.push('intimate vulnerability', 'unspoken yearning', 'fleeting connection');
+      mood.push('bittersweet', 'melancholic', 'poetic');
+      narrativeStyle.push('intimate character study', 'lyrical pacing');
+      visualAesthetic.push('soft focus naturalism', 'tactile warm light');
+    }
+  }
+
+  if (genres.includes('Comedy') && !genres.includes('Romance')) {
+    if (genres.includes('Drama') || keywords.some((k) => k.includes('satire') || k.includes('dark comedy') || k.includes('absurd'))) {
+      themes.push('human folly', 'satirical social critique', 'existential irony');
+      mood.push('wry', 'biting', 'subversive');
+      narrativeStyle.push('deadpan pacing', 'ironic detachment');
+    } else {
+      themes.push('chaotic misadventures', 'eccentric camaraderie');
+      mood.push('irreverent', 'playful', 'exuberant');
+      narrativeStyle.push('punchy comedic timing');
+    }
+    visualAesthetic.push('vivid contemporary framing');
+  }
+
+  if (genres.includes('Drama') && !genres.includes('Romance')) {
+    if (keywords.some((k) => k.includes('coming of age') || k.includes('adolescence') || k.includes('youth'))) {
+      themes.push('loss of innocence', 'identity formation', 'nostalgic yearning');
+      mood.push('poignant', 'tender', 'reflective');
+      visualAesthetic.push('sun-drenched nostalgia', 'intimate handheld realism');
+    } else if (keywords.some((k) => k.includes('family') || k.includes('grief') || k.includes('marriage'))) {
+      themes.push('interpersonal friction', 'quiet endurance', 'familial reconciliation');
+      mood.push('somber', 'deeply human', 'empathetic');
+      visualAesthetic.push('muted earth tones', 'observational framing');
+    } else {
+      themes.push('moral reckoning', 'human frailty', 'societal friction');
+      mood.push('poignant', 'meditative', 'emotionally raw');
+      visualAesthetic.push('grounded naturalism');
+    }
+    narrativeStyle.push('nuanced character study');
+  }
+
+  if (genres.includes('Action') || genres.includes('Adventure')) {
+    themes.push('heroic sacrifice', 'relentless momentum', 'high-stakes destiny');
+    mood.push('kinetic', 'electrifying', 'adrenaline-fueled');
+    narrativeStyle.push('dynamic set-piece escalation');
+    visualAesthetic.push('dynamic camera choreography', 'sweeping anamorphic scope');
+  }
+
+  if (genres.includes('Animation')) {
+    themes.push('boundless imagination', 'allegorical wonder', 'heartfelt empathy');
+    mood.push('enchanting', 'evocative', 'magical');
+    visualAesthetic.push('stylized artistic worldbuilding', 'expressive color theory');
+  }
+
+  if (genres.includes('Documentary')) {
+    themes.push('unfiltered truth', 'sociopolitical inquiry', 'historical record');
+    mood.push('illuminating', 'urgent', 'provocative');
+    narrativeStyle.push('investigative journalism', 'firsthand testimony');
+    visualAesthetic.push('verite realism', 'archival tapestry');
+  }
+
+  // Fallbacks if lists are empty
+  if (themes.length === 0) themes.push('search for meaning', 'identity & human condition');
+  if (mood.length === 0) mood.push('atmospheric', 'evocative', 'compelling');
+  if (narrativeStyle.length === 0) narrativeStyle.push('focused storytelling');
+  if (visualAesthetic.length === 0) visualAesthetic.push('cinematic framing');
+
+  const cleanThemes = Array.from(new Set(themes)).slice(0, 5);
+  const cleanMood = Array.from(new Set(mood)).slice(0, 4);
 
   return {
-    themes: Array.from(new Set(themes)).slice(0, 5),
-    mood: Array.from(new Set(mood)).slice(0, 4),
+    themes: cleanThemes,
+    mood: cleanMood,
     narrativeStyle: Array.from(new Set(narrativeStyle)).slice(0, 3),
     visualAesthetic: Array.from(new Set(visualAesthetic)).slice(0, 3),
-    pacing: overview.length > 250 ? 'slow-burn' : 'moderate',
-    emotionalTone: mood.slice(0, 2),
-    characterArchetypes: ['complex protagonist'],
+    pacing: overview.length > 280 ? 'slow-burn' : (genres.includes('Action') || genres.includes('Thriller') ? 'fast-paced' : 'moderate'),
+    emotionalTone: cleanMood.slice(0, 2),
+    characterArchetypes: ['complex protagonist', 'flawed visionary'],
     culturalTradition: movieData.originCountries?.[0] ? `${movieData.originCountries[0]} Cinema` : 'Global Cinema',
-    aiSummary: `A cinematic exploration of ${themes.join(' and ')}, marked by a ${mood.join(', ')} atmosphere.`,
+    aiSummary: `An evocative cinematic vision characterized by ${cleanMood.slice(0, 2).join(' and ')} tones, exploring themes of ${cleanThemes.slice(0, 2).join(' and ')}.`,
   };
 }
 
@@ -131,14 +241,38 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
   "aiSummary": "A concise 1-2 sentence aesthetic distillation capturing the cinematic essence of this film."
 }`;
 
-  // 1. Try Gemini
+  // 1. Try OpenRouter (if configured)
+  if (openrouterClient) {
+    try {
+      const modelName = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
+      const completion = await openrouterClient.chat.completions.create({
+        model: modelName,
+        max_tokens: 1000,
+        messages: [
+          { role: 'system', content: 'You are an expert film analyst providing structured JSON cinematic profiles.' },
+          { role: 'user', content: prompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+      });
+
+      const responseText = completion.choices[0].message.content.trim();
+      const parsed = JSON.parse(responseText);
+      return sanitizeProfile(parsed, movieData);
+    } catch (err) {
+      console.warn('OpenRouter analysis warning:', err.message);
+    }
+  }
+
+  // 2. Try Gemini
   if (geminiClient) {
     try {
       const model = geminiClient.getGenerativeModel({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-2.5-flash',
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.2,
+          maxOutputTokens: 1000,
         },
       });
 
@@ -151,11 +285,12 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
     }
   }
 
-  // 2. Try OpenAI
+  // 3. Try OpenAI
   if (openaiClient) {
     try {
       const completion = await openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
+        max_tokens: 1000,
         messages: [
           { role: 'system', content: 'You are an expert film analyst providing structured JSON cinematic profiles.' },
           { role: 'user', content: prompt },
@@ -172,7 +307,7 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
     }
   }
 
-  // 3. Fallback Heuristic Profile
+  // 4. Fallback to rich heuristic profiling
   console.info(`Using heuristic cinematic profiling for "${movieData.title}" (no active AI API key)`);
   return generateHeuristicProfile(movieData);
 }
@@ -277,4 +412,6 @@ module.exports = {
   analyzeFilm,
   createEmbedding,
   buildEmbeddingString,
+  generateHeuristicProfile,
+  generateHeuristicEmbedding,
 };

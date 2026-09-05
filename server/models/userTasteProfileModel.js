@@ -94,9 +94,25 @@ const userTasteProfileSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    cachedRecommendations: {
+      type: Array,
+      default: [],
+    },
+    cachedRecommendationsAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
+  }
+);
+
+// 30-Day TTL cleanup: Automatically delete inactive guest profiles (where userId does not exist) after 30 days
+userTasteProfileSchema.index(
+  { updatedAt: 1 },
+  {
+    expireAfterSeconds: 30 * 24 * 60 * 60, // 30 days
+    partialFilterExpression: { userId: { $exists: false } },
   }
 );
 

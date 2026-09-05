@@ -54,13 +54,14 @@ const Topbar = styled.header`
   @media (max-width: 640px) { padding: 1rem 1.25rem; }
 `
 
-const Logo = styled(Link)`
+const Logo = styled.span`
   font-family: 'kare', 'Playfair Display', Georgia, serif;
   font-size: 1.5rem;
   font-weight: 700;
   color: #111;
-  text-decoration: none;
   letter-spacing: -0.01em;
+  user-select: none;
+  cursor: default;
 `
 
 const AccuracyBadge = styled.div`
@@ -436,7 +437,7 @@ function DeepDive() {
   return (
     <PageWrapper>
       <Topbar>
-        <Logo to="/">Filmism</Logo>
+        <Logo>Filmism</Logo>
         <AccuracyBadge>
           <AccDot />
           taste accuracy

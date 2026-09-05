@@ -42,9 +42,39 @@ async function fetchTmdbMovieDetails(tmdbId) {
 }
 
 /**
- * Retrieve an existing profiled movie from MongoDB cache, or profile it via AI and cache it.
+ * Asynchronously enrich a movie profile with deep LLM analysis in the background.
  */
-async function getOrProfileMovie(tmdbId, forceReProfile = false) {
+async function enrichMovieWithAiBackground(numericId, rawData) {
+  try {
+    const profileOutput = await aiService.analyzeFilm(rawData);
+    const enrichedData = {
+      ...rawData,
+      profile: profileOutput,
+      aiSummary: profileOutput.aiSummary || rawData.overview,
+    };
+    const embeddingString = aiService.buildEmbeddingString(enrichedData);
+    const { embedding, model } = await aiService.createEmbedding(embeddingString);
+
+    await MovieProfile.findOneAndUpdate(
+      { tmdbId: numericId },
+      {
+        ...enrichedData,
+        embedding,
+        embeddingModel: model,
+        isProfiled: true,
+      },
+      { upsert: true }
+    );
+  } catch (err) {
+    // Fail silently in background
+  }
+}
+
+/**
+ * Retrieve an existing profiled movie from MongoDB cache, or profile it and cache it.
+ * FastMode generates instant heuristic profiles (<10ms) and enriches via AI in the background.
+ */
+async function getOrProfileMovie(tmdbId, forceReProfile = false, fastMode = true) {
   const numericId = Number(tmdbId);
   if (isNaN(numericId)) {
     throw new Error(`Invalid TMDB ID: ${tmdbId}`);
@@ -61,7 +91,35 @@ async function getOrProfileMovie(tmdbId, forceReProfile = false) {
   // 2. Fetch raw details from TMDB
   const rawData = await fetchTmdbMovieDetails(numericId);
 
-  // 3. Extract deep cinematic taste descriptors with AI
+  if (fastMode) {
+    // Fast synchronous heuristic profiling for instant response
+    const profileOutput = aiService.generateHeuristicProfile(rawData);
+    const enrichedData = {
+      ...rawData,
+      profile: profileOutput,
+      aiSummary: profileOutput.aiSummary || rawData.overview,
+    };
+    const embeddingString = aiService.buildEmbeddingString(enrichedData);
+    const embedding = aiService.generateHeuristicEmbedding(embeddingString, 768);
+
+    const savedProfile = await MovieProfile.findOneAndUpdate(
+      { tmdbId: numericId },
+      {
+        ...enrichedData,
+        embedding,
+        embeddingModel: 'heuristic-token-hash-768',
+        isProfiled: false, // will be enriched in background
+      },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+    );
+
+    // Queue deep AI enrichment in background without blocking
+    enrichMovieWithAiBackground(numericId, rawData);
+
+    return { profile: savedProfile, fromCache: false };
+  }
+
+  // 3. Deep AI profiling (when fastMode is false)
   const profileOutput = await aiService.analyzeFilm(rawData);
 
   // 4. Construct embedding string & generate dense vector
@@ -90,9 +148,9 @@ async function getOrProfileMovie(tmdbId, forceReProfile = false) {
 }
 
 /**
- * Batch profile a list of TMDB movie IDs with controlled concurrency.
+ * Batch profile a list of TMDB movie IDs with parallel concurrency.
  */
-async function batchGetOrProfileMovies(tmdbIds, concurrency = 4) {
+async function batchGetOrProfileMovies(tmdbIds, concurrency = 8) {
   if (!Array.isArray(tmdbIds) || tmdbIds.length === 0) {
     return [];
   }
@@ -111,12 +169,12 @@ async function batchGetOrProfileMovies(tmdbIds, concurrency = 4) {
 
   const missingIds = uniqueIds.filter((id) => !profileMap.has(id));
 
-  // 2. Profile missing films in chunks
+  // 2. Profile missing films concurrently in fast mode
   if (missingIds.length > 0) {
     for (let i = 0; i < missingIds.length; i += concurrency) {
       const chunk = missingIds.slice(i, i + concurrency);
       const results = await Promise.allSettled(
-        chunk.map((id) => getOrProfileMovie(id, false))
+        chunk.map((id) => getOrProfileMovie(id, false, true))
       );
 
       results.forEach((res, index) => {

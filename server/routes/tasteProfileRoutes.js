@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   initializeTasteProfile,
+  appendTasteProfileFavorites,
   getUserTasteProfile,
   updateFavoriteRating,
 } = require('../controllers/tasteProfileController');
@@ -9,6 +10,9 @@ const { optionalProtect } = require('../middleware/authMiddleware');
 
 // POST /api/taste-profile/initialize
 router.post('/initialize', optionalProtect, initializeTasteProfile);
+
+// POST /api/taste-profile/append
+router.post('/append', optionalProtect, appendTasteProfileFavorites);
 
 // GET /api/taste-profile/me
 router.get('/me', optionalProtect, getUserTasteProfile);

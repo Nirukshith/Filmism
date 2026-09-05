@@ -1,6 +1,8 @@
 const vectorService = require('./vectorService');
 const candidatePoolService = require('./candidatePoolService');
 const MovieProfile = require('../models/movieProfileModel');
+const UserTasteProfile = require('../models/userTasteProfileModel');
+const RecommendationLog = require('../models/recommendationLogModel');
 const { isMovieMatchingSelectedGenres } = require('../utils/genreMap');
 
 /**
@@ -98,6 +100,7 @@ async function generateRankedRecommendations(userProfile, options = {}) {
   const page = Math.max(1, parseInt(options.page, 10) || 1);
   const limit = Math.max(1, parseInt(options.limit, 10) || 12);
   const clusters = userProfile.tasteClusters || [];
+  const forceRefresh = options.refresh === true || options.forceRefresh === true;
 
   if (clusters.length === 0) {
     const empty = [];
@@ -108,21 +111,48 @@ async function generateRankedRecommendations(userProfile, options = {}) {
     return empty;
   }
 
-  const existingFavoriteIds = new Set((userProfile.favorites || []).map((f) => Number(f.tmdbId)));
-  const totalTargetNeeded = Math.max(36, page * limit + 20);
-  const perClusterTarget = Math.ceil(totalTargetNeeded / clusters.length) + 10;
+  // Fetch logged actions (watched, watchlisted, dismissed) for this user/session so they aren't re-recommended
+  let loggedTmdbIds = [];
+  try {
+    const logQuery = userProfile.userId
+      ? { userId: userProfile.userId, action: { $in: ['watched', 'watchlisted', 'dismissed'] } }
+      : { sessionId: userProfile.sessionId, action: { $in: ['watched', 'watchlisted', 'dismissed'] } };
+    const logs = await RecommendationLog.find(logQuery).select('tmdbId').lean();
+    loggedTmdbIds = logs.map((l) => Number(l.tmdbId)).filter(Boolean);
+  } catch (err) {
+    console.warn('Failed to query RecommendationLog for candidate exclusion:', err.message);
+  }
 
-  // 1. Collect candidate pool seeded from all current clusters & favorites
+  const existingExcludedIds = new Set([
+    ...(userProfile.favorites || []).map((f) => Number(f.tmdbId)),
+    ...loggedTmdbIds,
+  ]);
+
+  // 0. Cache Hit Check: Return cached recommendations filtered against excluded items
+  const isCacheFresh = userProfile.cachedRecommendationsAt && (Date.now() - new Date(userProfile.cachedRecommendationsAt).getTime() < 3600000 * 4); // 4 hours
+  if (!forceRefresh && isCacheFresh && Array.isArray(userProfile.cachedRecommendations) && userProfile.cachedRecommendations.length > 0) {
+    const filteredCached = userProfile.cachedRecommendations.filter((r) => !existingExcludedIds.has(Number(r.id || r.tmdbId)));
+    const startIndex = (page - 1) * limit;
+    const pagedList = filteredCached.slice(startIndex, startIndex + limit);
+    pagedList.page = page;
+    pagedList.limit = limit;
+    pagedList.total = filteredCached.length;
+    pagedList.hasMore = startIndex + pagedList.length < filteredCached.length;
+    return pagedList;
+  }
+
+  // 1. Fetch Candidate Pool proportionally across ALL clusters
+  const perClusterTarget = Math.max(16, Math.ceil(limit / clusters.length) + 8);
   const candidateLists = await Promise.all(
     clusters.map((c) => candidatePoolService.fetchCandidatesForCluster(c, userProfile, perClusterTarget))
   );
 
   const allCandidates = candidateLists.flat();
 
-  // Deduplicate candidates and ensure none of the user's selected favorites are included
+  // Deduplicate candidates and ensure none of the excluded (favorites, watched, watchlisted) are included
   const uniqueCandidateMap = new Map();
   allCandidates.forEach((m) => {
-    if (!existingFavoriteIds.has(Number(m.tmdbId))) {
+    if (!existingExcludedIds.has(Number(m.tmdbId))) {
       uniqueCandidateMap.set(Number(m.tmdbId), m);
     }
   });
@@ -130,7 +160,7 @@ async function generateRankedRecommendations(userProfile, options = {}) {
   // Also include top semantic matches from MongoDB MovieProfile collection
   try {
     const cachedCandidates = await MovieProfile.find({
-      tmdbId: { $nin: Array.from(existingFavoriteIds) },
+      tmdbId: { $nin: Array.from(existingExcludedIds) },
       'embedding.0': { $exists: true },
     }).lean();
 
@@ -143,22 +173,30 @@ async function generateRankedRecommendations(userProfile, options = {}) {
     });
   } catch (e) {}
 
-  // 2. Score each candidate against its best matching cluster
+  // 2. Score each candidate against its best matching cluster and record all matching personas
   const scoredList = [];
 
   uniqueCandidateMap.forEach((movie) => {
     let bestCluster = clusters[0];
     let maxScore = -1;
     let bestMatchingTags = [];
+    const matchingClusters = [];
 
     clusters.forEach((cluster) => {
       const { score, matchingTags } = scoreMovieAgainstCluster(movie, cluster);
+      if (score >= 0.60) {
+        matchingClusters.push(cluster.name);
+      }
       if (score > maxScore) {
         maxScore = score;
         bestCluster = cluster;
         bestMatchingTags = matchingTags;
       }
     });
+
+    if (!matchingClusters.includes(bestCluster.name)) {
+      matchingClusters.push(bestCluster.name);
+    }
 
     const matchPct = calculateMatchPercentage(maxScore);
     const whyExplanation = generateWhyRationale(movie, bestCluster, bestMatchingTags);
@@ -179,6 +217,7 @@ async function generateRankedRecommendations(userProfile, options = {}) {
       why: whyExplanation,
       sourceClusterId: bestCluster.clusterId,
       sourceClusterName: bestCluster.name,
+      matchingClusters,
       aiSummary: movie.aiSummary,
       stream: 'Available on Stream',
       c1: '#0d1b2a',
@@ -186,41 +225,73 @@ async function generateRankedRecommendations(userProfile, options = {}) {
     });
   });
 
-  // Sort overall by genre match priority first, then match score descending
-  scoredList.sort((a, b) => {
-    const aGenreMatch = isMovieMatchingSelectedGenres(a.genres, userProfile.selectedGenres);
-    const bGenreMatch = isMovieMatchingSelectedGenres(b.genres, userProfile.selectedGenres);
-    if (aGenreMatch && !bGenreMatch) return -1;
-    if (!aGenreMatch && bGenreMatch) return 1;
-    return b.score - a.score;
+  // Sort candidate list by score descending within each cluster
+  scoredList.sort((a, b) => b.score - a.score);
+
+  // 3. Apply Round-Robin Diversity across ALL clusters to guarantee balanced persona representation
+  const clusterBuckets = {};
+  clusters.forEach((c) => {
+    clusterBuckets[c.clusterId] = [];
   });
 
-  // 3. Apply Diversity Guardrail: Balance representation across all clusters
-  const clusterCounts = {};
-  const diverseRecommendations = [];
-  const deferred = [];
-  const totalSlotsToFill = Math.max(scoredList.length, page * limit + 10);
-  const maxSingleClusterCount = Math.max(2, Math.floor(totalSlotsToFill * 0.70));
-
-  for (const item of scoredList) {
-    const cId = item.sourceClusterId;
-    clusterCounts[cId] = clusterCounts[cId] || 0;
-
-    if (clusterCounts[cId] < maxSingleClusterCount) {
-      clusterCounts[cId]++;
-      diverseRecommendations.push(item);
+  scoredList.forEach((item) => {
+    if (clusterBuckets[item.sourceClusterId]) {
+      clusterBuckets[item.sourceClusterId].push(item);
     } else {
-      deferred.push(item);
+      const firstClusterId = clusters[0].clusterId;
+      clusterBuckets[firstClusterId] = clusterBuckets[firstClusterId] || [];
+      clusterBuckets[firstClusterId].push(item);
     }
+  });
+
+  // Helper: Fisher-Yates shuffle
+  const shuffleArray = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
+  const diverseRecommendations = [];
+  let addedAny = true;
+  let round = 0;
+
+  // On forceRefresh: shuffle top half of each bucket so results vary
+  // Keep deterministic sort on normal load so cached replay is consistent
+  if (forceRefresh) {
+    Object.keys(clusterBuckets).forEach((cId) => {
+      const bucket = clusterBuckets[cId];
+      if (bucket.length > 1) {
+        // Preserve the very top film, shuffle the rest
+        const top = bucket.slice(0, 1);
+        const rest = shuffleArray(bucket.slice(1));
+        clusterBuckets[cId] = [...top, ...rest];
+      }
+    });
   }
 
-  // Prioritize deferred from least represented clusters first
-  deferred.sort((a, b) => (clusterCounts[a.sourceClusterId] || 0) - (clusterCounts[b.sourceClusterId] || 0));
+  while (addedAny && diverseRecommendations.length < scoredList.length) {
+    addedAny = false;
+    for (const cluster of clusters) {
+      const bucket = clusterBuckets[cluster.clusterId];
+      if (bucket && bucket[round]) {
+        diverseRecommendations.push(bucket[round]);
+        addedAny = true;
+      }
+    }
+    round++;
+  }
 
-  while (deferred.length > 0) {
-    const item = deferred.shift();
-    clusterCounts[item.sourceClusterId] = (clusterCounts[item.sourceClusterId] || 0) + 1;
-    diverseRecommendations.push(item);
+  // Save generated recommendations to userProfile cache asynchronously
+  if (userProfile._id && diverseRecommendations.length > 0) {
+    UserTasteProfile.updateOne(
+      { _id: userProfile._id },
+      {
+        cachedRecommendations: diverseRecommendations,
+        cachedRecommendationsAt: new Date(),
+      }
+    ).catch(() => {});
   }
 
   // 4. Slice for the requested page

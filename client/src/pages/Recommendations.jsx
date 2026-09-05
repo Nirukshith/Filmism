@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTasteProfile } from '../hooks/useTasteProfile'
+import { getAuthStatus } from '../utils/auth'
 import api from '../services/api'
 import PostWatchModal from '../components/PostWatchModal'
-import RecalibrateModal from '../components/RecalibrateModal'
+import UserAvatar from '../components/UserAvatar'
 
 // ─── Styled Components ────────────────────────────────────────────────────────
 
@@ -20,40 +21,51 @@ const Topbar = styled.header`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.1rem 3rem;
+  padding: 0.75rem 1.5rem;
   border-bottom: 1.5px solid #ddd;
   background: #efefef;
   position: sticky;
   top: 0;
   z-index: 30;
-  @media (max-width: 640px) { padding: 1rem 1.25rem; }
+  @media (max-width: 640px) { padding: 0.65rem 1rem; }
 `
 
-const Logo = styled(Link)`
+const Logo = styled.span`
   font-family: 'kare', 'Playfair Display', Georgia, serif;
   font-size: 1.5rem;
   font-weight: 700;
   color: #111;
-  text-decoration: none;
   letter-spacing: -0.01em;
+  user-select: none;
+  cursor: default;
 `
 
 const TopbarRight = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+`
+
+const DashboardEyebrow = styled.div`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #ff751f;
+  margin-bottom: 0.25rem;
 `
 
 const TelemetryBadge = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: #ffffff;
   border: 1px solid #ddd;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #555;
 
   span {
@@ -62,112 +74,129 @@ const TelemetryBadge = styled.div`
   }
 `
 
-const RecalBtn = styled.button`
+const ContinueBtn = styled.button`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.8rem;
-  color: #555;
-  background: transparent;
-  border: 1.5px solid #ccc;
-  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  background: #ff751f;
+  border: 1.5px solid #ff751f;
+  padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { border-color: #111; color: #111; }
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  &:hover {
+    background: #e6600c;
+    border-color: #e6600c;
+  }
 `
 
 const PageBody = styled.div`
   flex: 1;
-  padding: 2.5rem 3rem 8rem;
-  max-width: 1080px;
+  padding: 1rem 1.75rem 4.5rem;
+  max-width: 1380px;
   width: 100%;
   margin: 0 auto;
-  @media (max-width: 768px) { padding: 1.5rem 1.25rem 8rem; }
+  @media (max-width: 768px) { padding: 0.85rem 1rem 4.5rem; }
 `
 
 const ProfilePanel = styled.div`
   background: #fff;
   border: 1.5px solid #ddd;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.25rem;
   box-shadow: 0 4px 16px rgba(0,0,0,0.03);
 `
 
 const ProfileTop = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
 `
 
 const ProfileTitle = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+  font-size: clamp(1.4rem, 2.8vw, 1.85rem);
   font-weight: 700;
   color: #111;
   line-height: 1.15;
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.35rem;
 `
 
 const ProfileSub = styled.p`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.92rem;
+  font-size: 0.82rem;
   color: #666;
-  line-height: 1.6;
-  margin: 0;
-  max-width: 680px;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 560px;
+  text-align: center;
 `
 
 const RefineBtn = styled.button`
-  background: #111;
-  color: #fff;
-  border: 1.5px solid #111;
-  border-radius: 6px;
-  padding: 8px 16px;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  color: #fff;
+  background: #111;
+  border: 1.5px solid #111;
+  padding: 6px 12px;
+  border-radius: 6px;
   cursor: pointer;
-  white-space: nowrap;
   transition: all 0.2s;
-  &:hover { background: transparent; color: #111; }
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  &:hover { background: #333; }
 `
 
 const ClustersRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   flex-wrap: wrap;
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
   border-top: 1px solid #eee;
 `
 
-const ClusterTag = styled.span`
-  background: rgba(255, 117, 31, 0.1);
-  color: #ff751f;
-  border: 1px solid rgba(255, 117, 31, 0.25);
+const ClusterTag = styled.button`
+  background: ${({ $active }) => ($active ? '#ff751f' : 'rgba(255, 117, 31, 0.1)')};
+  color: ${({ $active }) => ($active ? '#fff' : '#ff751f')};
+  border: 1px solid ${({ $active }) => ($active ? '#ff751f' : 'rgba(255, 117, 31, 0.25)')};
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    background: #ff751f;
+    color: #fff;
+    border-color: #ff751f;
+  }
 `
 
 const FilterBar = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 1.5rem;
+  gap: 6px;
+  margin-bottom: 1rem;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 `
 
 const FilterPill = styled.button`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.78rem;
-  padding: 6px 14px;
+  font-size: 0.75rem;
+  padding: 4px 12px;
   border-radius: 999px;
   border: 1.5px solid ${({ $active }) => ($active ? '#111' : '#ddd')};
   background: ${({ $active }) => ($active ? '#111' : '#fff')};
@@ -180,67 +209,70 @@ const FilterPill = styled.button`
 `
 
 const RecList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.9rem;
+
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
 `
 
 const RecCard = styled.div`
   background: #fff;
   border: 1.5px solid #ddd;
-  border-radius: 14px;
-  padding: 1.5rem;
-  display: grid;
-  grid-template-columns: 140px 1fr auto;
-  gap: 1.5rem;
-  align-items: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.65rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
     transform: translateY(-2px);
     border-color: #ff751f;
-    box-shadow: 0 10px 25px rgba(255, 117, 31, 0.1);
-  }
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+    box-shadow: 0 8px 20px rgba(255, 117, 31, 0.08);
   }
 `
 
+const RecCardTop = styled.div`
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+`
+
 const RecPoster = styled.div`
-  width: 140px;
-  height: 190px;
-  border-radius: 8px;
+  width: 95px;
+  height: 135px;
+  border-radius: 6px;
   background: ${({ $posterPath, $c1, $c2 }) =>
     $posterPath
       ? `url(https://image.tmdb.org/t/p/w500${$posterPath}) center / cover no-repeat`
       : `linear-gradient(180deg, ${$c1 || '#0d1b2a'}, ${$c2 || '#1e4d7b'})`};
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-
-  @media (max-width: 768px) {
-    width: 100%;
-    height: 200px;
-  }
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
 `
 
 const RecBody = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
 `
 
 const RecTopRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 `
 
 const RecTitle = styled.h2`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #111;
   margin: 0;
@@ -251,9 +283,9 @@ const MatchPill = styled.span`
   background: #2e7d32;
   color: #fff;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
 `
 
@@ -261,28 +293,28 @@ const ClusterSourceBadge = styled.span`
   background: #f0f0f0;
   color: #444;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid #e0e0e0;
 `
 
 const RecMeta = styled.div`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: #777;
 `
 
 const WhyBox = styled.div`
   background: #fafafa;
   border-left: 3px solid #ff751f;
-  padding: 0.75rem 1rem;
-  border-radius: 0 8px 8px 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 6px 6px 0;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   color: #333;
-  line-height: 1.5;
+  line-height: 1.45;
 
   strong {
     color: #ff751f;
@@ -291,38 +323,43 @@ const WhyBox = styled.div`
 
 const OutcomeBadge = styled.div`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: #2e7d32;
   background: rgba(46, 125, 50, 0.1);
   border: 1px solid rgba(46, 125, 50, 0.25);
-  padding: 3px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
   width: fit-content;
 `
 
-const RecRight = styled.div`
+const RecActions = styled.div`
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f0f0f0;
+`
 
-  @media (max-width: 768px) {
-    align-items: flex-start;
-    flex-direction: row;
-  }
+const RecActionsLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
 `
 
 const ActionBtn = styled.button`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 8px 14px;
-  border-radius: 6px;
+  padding: 5px 10px;
+  border-radius: 5px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   transition: all 0.2s;
   white-space: nowrap;
 
@@ -341,17 +378,17 @@ const DismissBtn = styled.button`
   border: none;
   color: #aaa;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   cursor: pointer;
-  padding: 4px 6px;
+  padding: 2px 4px;
   &:hover { color: #e05353; }
 `
 
 const EmptyState = styled.div`
   text-align: center;
-  padding: 4rem 1rem;
+  padding: 3rem 1rem;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: #888;
 `
 
@@ -360,8 +397,8 @@ const LoadMoreWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-top: 2.5rem;
-  gap: 0.75rem;
+  margin-top: 1.75rem;
+  gap: 0.5rem;
 `
 
 const LoadMoreBtn = styled.button`
@@ -406,6 +443,15 @@ const EndOfListNotice = styled.div`
 function Recommendations() {
   const navigate = useNavigate()
   const { sessionId, tasteClusters } = useTasteProfile()
+  const { user } = getAuthStatus()
+  const isReturningUser = localStorage.getItem('filmism_is_returning_user') === 'true'
+
+  let greetingTitle = 'Welcome to Filmism'
+  if (user?.firstName) {
+    greetingTitle = isReturningUser ? `Welcome back, ${user.firstName}` : `Welcome, ${user.firstName}`
+  } else if (isReturningUser) {
+    greetingTitle = 'Welcome back'
+  }
 
   const [recommendations, setRecommendations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -417,10 +463,11 @@ function Recommendations() {
   const [watchedOutcomes, setWatchedOutcomes] = useState({}) // { [tmdbId]: ratingNumber }
   const [dismissed, setDismissed] = useState([])
   const [activeModalMovie, setActiveModalMovie] = useState(null)
-  const [showRecalibrateModal, setShowRecalibrateModal] = useState(false)
   const [telemetry, setTelemetry] = useState({ hitRate: 88, totalShown: 0 })
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const fetchRecommendations = async (pageNum = 1, append = false) => {
+  const fetchRecommendations = async (pageNum = 1, append = false, refresh = false) => {
+    if (refresh) setIsRefreshing(true)
     if (append) {
       setLoadingMore(true)
     } else {
@@ -429,7 +476,7 @@ function Recommendations() {
 
     try {
       const [recsRes, statsRes] = await Promise.allSettled([
-        api.get('/recommendations/ranked', { params: { sessionId, page: pageNum, limit: 12 } }),
+        api.get('/recommendations/ranked', { params: { sessionId, page: pageNum, limit: 12, refresh } }),
         api.get('/recommendations/telemetry-stats', { params: { sessionId } }),
       ])
 
@@ -456,12 +503,45 @@ function Recommendations() {
     } finally {
       setLoading(false)
       setLoadingMore(false)
+      setIsRefreshing(false)
     }
   }
 
-  // Fetch real ranked recommendations and telemetry stats
+  // Fetch recommendations — force refresh if user just logged in
   useEffect(() => {
-    fetchRecommendations(1, false)
+    const fetchInitialData = async () => {
+      // 1. Fetch user's existing logs so already watchlisted/watched movies are excluded on first render
+      try {
+        const [wRes, dRes] = await Promise.allSettled([
+          api.get('/recommendations/watchlist', { params: { sessionId } }),
+          api.get('/recommendations/diary', { params: { sessionId } }),
+        ])
+        if (wRes.status === 'fulfilled' && Array.isArray(wRes.value.data?.watchlist)) {
+          setWatchlist(wRes.value.data.watchlist.map((item) => Number(item.tmdbId || item.id)))
+        }
+        if (dRes.status === 'fulfilled' && Array.isArray(dRes.value.data?.diary)) {
+          const outcomes = {}
+          dRes.value.data.diary.forEach((item) => {
+            const id = Number(item.tmdbId || item.id)
+            if (id) outcomes[id] = item.outcomeRating || 3
+          })
+          setWatchedOutcomes(outcomes)
+        }
+      } catch (e) {
+        // silent fallback
+      }
+
+      // 2. Fetch recommendations
+      const needsRefresh = localStorage.getItem('filmism_needs_refresh') === 'true'
+      if (needsRefresh) {
+        localStorage.removeItem('filmism_needs_refresh')
+        fetchRecommendations(1, false, true)  // force fresh matches post-login
+      } else {
+        fetchRecommendations(1, false)
+      }
+    }
+
+    fetchInitialData()
   }, [sessionId])
 
   const handleLoadMore = () => {
@@ -471,37 +551,42 @@ function Recommendations() {
   }
 
   const handleToggleWatchlist = async (movie) => {
-    const isCurrentlyWatchlisted = watchlist.includes(movie.id)
+    const movieId = Number(movie.id || movie.tmdbId)
+    const isCurrentlyWatchlisted = watchlist.includes(movieId)
     const newWatchlist = isCurrentlyWatchlisted
-      ? watchlist.filter((x) => x !== movie.id)
-      : [...watchlist, movie.id]
+      ? watchlist.filter((x) => x !== movieId)
+      : [...watchlist, movieId]
 
     setWatchlist(newWatchlist)
+    // Remove immediately from active recommendations list
+    setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
 
     try {
       await api.post('/recommendations/action', {
         sessionId,
-        tmdbId: movie.id,
+        tmdbId: movieId,
         title: movie.title,
         sourceClusterId: movie.sourceClusterId,
         sourceClusterName: movie.sourceClusterName,
         matchScore: movie.match,
         action: isCurrentlyWatchlisted ? 'shown' : 'watchlisted',
       })
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const handleDismiss = async (movie) => {
-    setDismissed((prev) => [...prev, movie.id])
+    const movieId = Number(movie.id || movie.tmdbId)
+    setDismissed((prev) => [...prev, movieId])
+    setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
     try {
       await api.post('/recommendations/action', {
         sessionId,
-        tmdbId: movie.id,
+        tmdbId: movieId,
         title: movie.title,
         sourceClusterId: movie.sourceClusterId,
         action: 'dismissed',
       })
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const handleOpenWatchedModal = (movie) => {
@@ -509,16 +594,19 @@ function Recommendations() {
   }
 
   const handleSubmitOutcome = async (movie, outcomeRating) => {
+    const movieId = Number(movie.id || movie.tmdbId)
     setWatchedOutcomes((prev) => ({
       ...prev,
-      [movie.id]: outcomeRating,
+      [movieId]: outcomeRating,
     }))
+    // Remove immediately from recommendations list
+    setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
     setActiveModalMovie(null)
 
     try {
       await api.post('/recommendations/outcome', {
         sessionId,
-        tmdbId: movie.id,
+        tmdbId: movieId,
         outcomeRating,
         sourceClusterId: movie.sourceClusterId,
       })
@@ -532,10 +620,18 @@ function Recommendations() {
     }
   }
 
-  const activeRecs = recommendations.filter((r) => !dismissed.includes(r.id))
+  const activeRecs = recommendations.filter((r) => {
+    const rId = Number(r.id || r.tmdbId)
+    return (
+      !dismissed.includes(rId) &&
+      !watchlist.includes(rId) &&
+      !watchedOutcomes[rId]
+    )
+  })
 
-  // Filter options
-  const filterOptions = ['all']
+  // Filter options: guaranteed to include ALL active taste personas plus any extra cluster names
+  const personaNames = (tasteClusters || []).map((c) => c.name).filter(Boolean)
+  const filterOptions = ['all', ...Array.from(new Set(personaNames))]
   activeRecs.forEach((r) => {
     if (r.sourceClusterName && !filterOptions.includes(r.sourceClusterName)) {
       filterOptions.push(r.sourceClusterName)
@@ -544,7 +640,11 @@ function Recommendations() {
 
   const filteredRecs = activeRecs.filter((r) => {
     if (activeFilter === 'all') return true
-    return r.sourceClusterName === activeFilter || r.genre === activeFilter
+    return (
+      r.sourceClusterName === activeFilter ||
+      (Array.isArray(r.matchingClusters) && r.matchingClusters.includes(activeFilter)) ||
+      r.genre === activeFilter
+    )
   })
 
   return (
@@ -557,19 +657,21 @@ function Recommendations() {
         />
       )}
 
-      <RecalibrateModal
-        isOpen={showRecalibrateModal}
-        onClose={() => setShowRecalibrateModal(false)}
-      />
-
       <PageWrapper>
         <Topbar>
-          <Logo to="/">Filmism</Logo>
+          <Logo>Filmism</Logo>
           <TopbarRight>
-            <TelemetryBadge>
-              hit rate: <span>{telemetry.hitRate || 88}%</span>
-            </TelemetryBadge>
-            <RecalBtn onClick={() => setShowRecalibrateModal(true)}>recalibrate profile →</RecalBtn>
+            <RefineBtn
+              style={{ background: '#fff', color: '#111', border: '1.5px solid #ccc', opacity: isRefreshing ? 0.7 : 1, fontSize: '0.75rem', padding: '4px 10px' }}
+              disabled={isRefreshing}
+              onClick={() => fetchRecommendations(1, false, true)}
+            >
+              {isRefreshing ? '↻ Refreshing...' : '↻ Refresh Matches'}
+            </RefineBtn>
+            <ContinueBtn onClick={() => navigate('/taste?mode=continue')}>
+              + Continue Build Profile
+            </ContinueBtn>
+            <UserAvatar />
           </TopbarRight>
         </Topbar>
 
@@ -577,19 +679,12 @@ function Recommendations() {
           <ProfilePanel>
             <ProfileTop>
               <div>
-                <ProfileTitle>Your Ranked Matches</ProfileTitle>
+                <DashboardEyebrow>Cinema Dashboard</DashboardEyebrow>
+                <ProfileTitle>{greetingTitle}</ProfileTitle>
                 <ProfileSub>
                   Personalized cinematic recommendations scored across your distinct taste personas.
                   Separating pre-watch intent from post-watch outcome ratings.
                 </ProfileSub>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <RefineBtn style={{ background: '#fff', color: '#111', border: '1.5px solid #ccc' }} onClick={() => fetchRecommendations(1, false)}>
-                  ↻ Refresh Matches
-                </RefineBtn>
-                <RefineBtn onClick={() => setShowRecalibrateModal(true)}>
-                  + Recalibrate Taste
-                </RefineBtn>
               </div>
             </ProfileTop>
 
@@ -599,7 +694,13 @@ function Recommendations() {
                   active personas:
                 </span>
                 {tasteClusters.map((c, i) => (
-                  <ClusterTag key={c.clusterId || i}>{c.name}</ClusterTag>
+                  <ClusterTag
+                    key={c.clusterId || i}
+                    $active={activeFilter === c.name}
+                    onClick={() => setActiveFilter(activeFilter === c.name ? 'all' : c.name)}
+                  >
+                    {c.name}
+                  </ClusterTag>
                 ))}
               </ClustersRow>
             )}
@@ -633,55 +734,61 @@ function Recommendations() {
 
                   return (
                     <RecCard key={rec.id} id={`rec-${rec.id}`}>
-                      <RecPoster
-                        $posterPath={rec.posterPath}
-                        $c1={rec.c1}
-                        $c2={rec.c2}
-                      />
+                      <RecCardTop>
+                        <RecPoster
+                          $posterPath={rec.posterPath}
+                          $c1={rec.c1}
+                          $c2={rec.c2}
+                        />
 
-                      <RecBody>
-                        <RecTopRow>
-                          <RecTitle>{rec.title}</RecTitle>
-                          <MatchPill>{rec.match}% Match</MatchPill>
+                        <RecBody>
+                          <RecTopRow>
+                            <RecTitle>{rec.title}</RecTitle>
+                            <MatchPill>{rec.match}% Match</MatchPill>
+                          </RecTopRow>
+
                           {rec.sourceClusterName && (
                             <ClusterSourceBadge>{rec.sourceClusterName}</ClusterSourceBadge>
                           )}
+
                           {outcomeRating && (
                             <OutcomeBadge>
                               Verdict: {outcomeRating === 4 ? '✦ Great' : outcomeRating === 3 ? '★ Good' : outcomeRating === 2 ? '∼ Okay' : '✕ Not for me'}
                             </OutcomeBadge>
                           )}
-                        </RecTopRow>
 
-                        <RecMeta>
-                          {rec.year} · {(rec.genres || [rec.genre]).join(' · ')} · directed by {rec.director}
-                        </RecMeta>
+                          <RecMeta>
+                            {rec.year} · {(rec.genres || [rec.genre]).slice(0, 3).join(' · ')} · dir. {rec.director}
+                          </RecMeta>
+                        </RecBody>
+                      </RecCardTop>
 
-                        <WhyBox>
-                          <strong>Why you'll like this: </strong>
-                          {rec.why}
-                        </WhyBox>
-                      </RecBody>
+                      <WhyBox>
+                        <strong>Why you'll like this: </strong>
+                        {rec.why}
+                      </WhyBox>
 
-                      <RecRight>
-                        <ActionBtn
-                          $type="watchlist"
-                          $active={isWatchlisted}
-                          onClick={() => handleToggleWatchlist(rec)}
-                        >
-                          {isWatchlisted ? '✓ Watchlisted' : '+ Watchlist'}
-                        </ActionBtn>
-                        <ActionBtn
-                          $type="watched"
-                          $active={isWatched}
-                          onClick={() => handleOpenWatchedModal(rec)}
-                        >
-                          {isWatched ? '✓ Rated Outcome' : 'Mark Watched'}
-                        </ActionBtn>
+                      <RecActions>
+                        <RecActionsLeft>
+                          <ActionBtn
+                            $type="watchlist"
+                            $active={isWatchlisted}
+                            onClick={() => handleToggleWatchlist(rec)}
+                          >
+                            {isWatchlisted ? '✓ Watchlisted' : '+ Watchlist'}
+                          </ActionBtn>
+                          <ActionBtn
+                            $type="watched"
+                            $active={isWatched}
+                            onClick={() => handleOpenWatchedModal(rec)}
+                          >
+                            {isWatched ? '✓ Rated Outcome' : 'Mark Watched'}
+                          </ActionBtn>
+                        </RecActionsLeft>
                         <DismissBtn onClick={() => handleDismiss(rec)}>
                           not interested ✕
                         </DismissBtn>
-                      </RecRight>
+                      </RecActions>
                     </RecCard>
                   )
                 })}

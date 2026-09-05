@@ -1,5 +1,6 @@
 const tasteClusterService = require('../services/tasteClusterService');
 const UserTasteProfile = require('../models/userTasteProfileModel');
+const jwt = require('jsonwebtoken');
 
 /**
  * POST /api/taste-profile/initialize
@@ -27,12 +28,18 @@ const initializeTasteProfile = async (req, res) => {
       favorites,
     });
 
+    const updatedToken = userId
+      ? jwt.sign({ id: userId, tasteProfileComplete: true }, process.env.JWT_SECRET, { expiresIn: '30d' })
+      : undefined;
+
     res.json({
       success: true,
       sessionId: effectiveSessionId,
       tasteProfile: result.tasteProfile,
       clusters: result.clusters,
       aiSynthesis: result.aiSynthesis,
+      tasteProfileComplete: true,
+      token: updatedToken,
     });
   } catch (error) {
     console.error('Error initializing taste profile:', error);
@@ -132,8 +139,46 @@ const updateFavoriteRating = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/taste-profile/append
+ * Incrementally append new favorite films & ratings to active taste profile without resetting.
+ */
+const appendTasteProfileFavorites = async (req, res) => {
+  try {
+    const { favorites = [], sessionId } = req.body;
+    const userId = req.user?._id || req.user?.id;
+
+    if (!Array.isArray(favorites) || favorites.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide at least 1 new favorite film to append.',
+      });
+    }
+
+    const effectiveSessionId = !userId ? (sessionId || `guest_${Date.now()}`) : undefined;
+
+    const result = await tasteClusterService.appendFavoritesToTasteProfile({
+      userId,
+      sessionId: effectiveSessionId,
+      newFavorites: favorites,
+    });
+
+    res.json({
+      success: true,
+      sessionId: effectiveSessionId,
+      tasteProfile: result.tasteProfile,
+      clusters: result.clusters,
+      aiSynthesis: result.aiSynthesis,
+    });
+  } catch (error) {
+    console.error('Error appending taste profile favorites:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   initializeTasteProfile,
+  appendTasteProfileFavorites,
   getUserTasteProfile,
   updateFavoriteRating,
 };

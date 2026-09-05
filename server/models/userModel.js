@@ -21,6 +21,13 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/\S+@\S+\.\S+/, 'Please enter a valid email'],
     },
+    // Holds a new email address while awaiting OTP verification before committing
+    pendingEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
+    },
     password: {
       type: String,
       required: [true, 'Password is required'],
@@ -33,6 +40,7 @@ const userSchema = new mongoose.Schema(
 
 
     // Taste profile — filled in after register
+    tasteProfileComplete: { type: Boolean, default: false },
     selectedCinemas: { type: [Number], default: [] }, // local Filmism cinema IDs (1–8)
     selectedGenres: { type: [Number], default: [] }, // TMDB genre IDs
     selectedPosters: { type: [Number], default: [] }, // TMDB film IDs

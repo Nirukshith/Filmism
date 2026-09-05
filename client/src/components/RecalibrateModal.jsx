@@ -197,21 +197,7 @@ function RecalibrateModal({ isOpen, onClose }) {
         </Header>
 
         <OptionsList>
-          {/* Option 1: Favourites */}
-          <OptionCard onClick={() => handleSelect('favourites')}>
-            <OptionIconWrap>🎬</OptionIconWrap>
-            <OptionContent>
-              <OptionHeaderRow>
-                <OptionTitle>Recalibrate Favourites</OptionTitle>
-                <Badge $type="keep">Keeps Genres & Origins</Badge>
-              </OptionHeaderRow>
-              <OptionDesc>
-                Adjust or change your selected favorite movies. Your selected genres and cinema origins remain unchanged.
-              </OptionDesc>
-            </OptionContent>
-          </OptionCard>
-
-          {/* Option 2: Origins */}
+          {/* Option 1: Origins */}
           <OptionCard onClick={() => handleSelect('origins')}>
             <OptionIconWrap>🌍</OptionIconWrap>
             <OptionContent>
@@ -225,7 +211,7 @@ function RecalibrateModal({ isOpen, onClose }) {
             </OptionContent>
           </OptionCard>
 
-          {/* Option 3: Genres */}
+          {/* Option 2: Genres */}
           <OptionCard onClick={() => handleSelect('genres')}>
             <OptionIconWrap>🎭</OptionIconWrap>
             <OptionContent>

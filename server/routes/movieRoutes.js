@@ -37,10 +37,10 @@ router.get('/genres', async (req, res) => {
   }
 });
 
-// Discover movies by genre/origin — used in TasteProfile film picker
+// Discover movies by genre/origin/decade — used in TasteProfile film picker
 router.get('/discover', async (req, res) => {
   try {
-    let { with_genres, with_origin_country } = req.query;
+    let { with_genres, with_origin_country, release_date_gte, release_date_lte, decade } = req.query;
     const page = parseInt(req.query.page) || 1;
 
     if (with_genres) {
@@ -52,8 +52,39 @@ router.get('/discover', async (req, res) => {
         .join('|');
     }
 
+    let gte = release_date_gte;
+    let lte = release_date_lte;
+
+    if (decade) {
+      if (decade === '2020s') {
+        gte = '2020-01-01';
+        lte = '2029-12-31';
+      } else if (decade === '2010s') {
+        gte = '2010-01-01';
+        lte = '2019-12-31';
+      } else if (decade === '2000s') {
+        gte = '2000-01-01';
+        lte = '2009-12-31';
+      } else if (decade === '1990s') {
+        gte = '1990-01-01';
+        lte = '1999-12-31';
+      } else if (decade === '1980s') {
+        gte = '1980-01-01';
+        lte = '1989-12-31';
+      } else if (decade === 'classic') {
+        lte = '1979-12-31';
+      }
+    }
+
     const { data } = await tmdb.get('/discover/movie', {
-      params: { with_genres: with_genres || undefined, with_origin_country, page, sort_by: 'popularity.desc' },
+      params: {
+        with_genres: with_genres || undefined,
+        with_origin_country,
+        'primary_release_date.gte': gte || undefined,
+        'primary_release_date.lte': lte || undefined,
+        page,
+        sort_by: 'popularity.desc',
+      },
     });
 
     res.json({

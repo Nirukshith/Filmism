@@ -366,9 +366,9 @@ function LoginPage() {
     password: '',
   })
 
-  const [errors, setErrors]       = useState({})
-  const [loading, setLoading]     = useState(false)
-  const [showPass, setShowPass]   = useState(false)
+  const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [showPass, setShowPass] = useState(false)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -378,9 +378,9 @@ function LoginPage() {
 
   const validate = () => {
     const newErrors = {}
-    if (!form.email.trim())   newErrors.email    = 'required'
+    if (!form.email.trim()) newErrors.email = 'required'
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'invalid email'
-    if (!form.password)       newErrors.password = 'required'
+    if (!form.password) newErrors.password = 'required'
     return newErrors
   }
 
@@ -395,18 +395,18 @@ function LoginPage() {
     setLoading(true)
     try {
       const response = await authAPI.login({ email: form.email, password: form.password })
-      
+
       if (response.data.token) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data))
+        localStorage.setItem('filmism_needs_refresh', 'true')  // force fresh matches on next dashboard load
+        localStorage.setItem('filmism_is_returning_user', 'true')
       }
 
       const user = response.data
-      // If user has already completed taste profile setup, redirect to recommendations
-      if (
-        (user.selectedGenres && user.selectedGenres.length > 0) ||
-        (user.selectedCinemas && user.selectedCinemas.length > 0)
-      ) {
+      const isComplete = !!(user.tasteProfileComplete)
+
+      if (isComplete) {
         navigate('/recommend')
       } else {
         navigate('/taste')

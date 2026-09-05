@@ -83,10 +83,23 @@ export function TasteProvider({ children }) {
       })
 
       if (response.data?.success) {
-        const { tasteProfile, clusters, aiSynthesis: synthesis, sessionId: newSessionId } = response.data
+        const { tasteProfile, clusters, aiSynthesis: synthesis, sessionId: newSessionId, token: updatedToken } = response.data
         setUserTasteProfile(tasteProfile)
         setTasteClusters(clusters || [])
         setAiSynthesis(synthesis || '')
+
+        if (updatedToken) {
+          localStorage.setItem('token', updatedToken)
+        }
+
+        const storedUser = localStorage.getItem('user')
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser)
+            parsedUser.tasteProfileComplete = true
+            localStorage.setItem('user', JSON.stringify(parsedUser))
+          } catch (e) {}
+        }
 
         if (newSessionId) {
           setSessionId(newSessionId)
@@ -100,6 +113,44 @@ export function TasteProvider({ children }) {
       }
     } catch (error) {
       console.error('Failed to initialize taste profile:', error)
+      throw error
+    }
+  }
+
+  // Incrementally append new favorites and ratings to existing taste profile
+  const appendProfileFavorites = async ({ films, ratingsMap = {} }) => {
+    try {
+      const favoritesPayload = (films || []).map((id) => ({
+        tmdbId: Number(id),
+        rating: ratingsMap[id] !== undefined ? ratingsMap[id] : (favoriteRatings[id] || 3),
+      }))
+
+      const response = await api.post('/taste-profile/append', {
+        favorites: favoritesPayload,
+        sessionId,
+      })
+
+      if (response.data?.success) {
+        const { tasteProfile, clusters, aiSynthesis: synthesis, sessionId: newSessionId } = response.data
+        setUserTasteProfile(tasteProfile)
+        setTasteClusters(clusters || [])
+        if (synthesis) setAiSynthesis(synthesis)
+
+        setSelectedFilms((prev) => Array.from(new Set([...prev, ...(films || [])])))
+        setFavoriteRatings((prev) => ({ ...prev, ...ratingsMap }))
+
+        if (newSessionId) {
+          setSessionId(newSessionId)
+          localStorage.setItem('filmism_session_id', newSessionId)
+        }
+
+        localStorage.setItem('filmism_taste_clusters', JSON.stringify(clusters || []))
+        if (synthesis) localStorage.setItem('filmism_ai_synthesis', synthesis)
+
+        return response.data
+      }
+    } catch (error) {
+      console.error('Failed to append taste profile favorites:', error)
       throw error
     }
   }
@@ -165,9 +216,8 @@ export function TasteProvider({ children }) {
         tasteClusters,
         setTasteClusters,
         userTasteProfile,
+        setUserTasteProfile,
         aiSynthesis,
-        initializeProfile,
-        sessionId,
         ratings,
         setRatings,
         watchlist,
@@ -176,8 +226,11 @@ export function TasteProvider({ children }) {
         setHaventSeen,
         aestheticProfile,
         setAestheticProfile,
+        initializeProfile,
+        appendProfileFavorites,
         syncTasteProfile,
         clearProfile,
+        sessionId,
       }}
     >
       {children}

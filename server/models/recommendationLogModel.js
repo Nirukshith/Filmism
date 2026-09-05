@@ -65,6 +65,15 @@ const recommendationLogSchema = new mongoose.Schema(
   }
 );
 
+// 30-Day TTL cleanup: Automatically delete inactive guest telemetry logs (where userId does not exist) after 30 days
+recommendationLogSchema.index(
+  { updatedAt: 1 },
+  {
+    expireAfterSeconds: 30 * 24 * 60 * 60, // 30 days
+    partialFilterExpression: { userId: { $exists: false } },
+  }
+);
+
 const RecommendationLog = mongoose.model('RecommendationLog', recommendationLogSchema);
 
 module.exports = RecommendationLog;

@@ -20,43 +20,34 @@ const RATING_WEIGHT_DELTAS = {
  * 2. TMDB /discover/movie filtered by cluster genres & user origins
  * 3. Existing MongoDB profiled movies closest to the cluster's centroid embedding
  */
-async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 15) {
+async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 12) {
   const existingIds = new Set([
     ...(userProfile.favorites || []).map((f) => Number(f.tmdbId)),
   ]);
 
   const candidateIdSet = new Set();
-  const sourceFavIds = cluster.sourceFavoriteIds || [];
+  const sourceFavIds = (cluster.sourceFavoriteIds || []).slice(0, 4);
 
-  // 1. Fetch TMDB recommendations and similar movies for favorites in this cluster
-  for (const favId of sourceFavIds.slice(0, 5)) {
-    try {
-      const [recsRes, simRes] = await Promise.allSettled([
-        tmdb.get(`/movie/${favId}/recommendations`, { params: { page: 1 } }),
-        tmdb.get(`/movie/${favId}/similar`, { params: { page: 1 } }),
-      ]);
+  // 1. Concurrently fetch TMDB recommendations and similar movies for favorites in this cluster
+  if (sourceFavIds.length > 0) {
+    const promises = sourceFavIds.flatMap((favId) => [
+      tmdb.get(`/movie/${favId}/recommendations`, { params: { page: 1 } }),
+      tmdb.get(`/movie/${favId}/similar`, { params: { page: 1 } }),
+    ]);
 
-      if (recsRes.status === 'fulfilled') {
-        (recsRes.value.data?.results || []).forEach((m) => {
-          if (!existingIds.has(m.id) && m.poster_path && m.vote_count > 20) {
+    const results = await Promise.allSettled(promises);
+    results.forEach((res) => {
+      if (res.status === 'fulfilled' && res.value?.data?.results) {
+        res.value.data.results.forEach((m) => {
+          if (!existingIds.has(m.id) && m.poster_path && (m.vote_count || 0) > 20) {
             candidateIdSet.add(m.id);
           }
         });
       }
-
-      if (simRes.status === 'fulfilled') {
-        (simRes.value.data?.results || []).forEach((m) => {
-          if (!existingIds.has(m.id) && m.poster_path && m.vote_count > 20) {
-            candidateIdSet.add(m.id);
-          }
-        });
-      }
-    } catch (e) {
-      // Continue if TMDB query fails for a single ID
-    }
+    });
   }
 
-  // 2. Discover films matching user's selected genres & origins from TMDB
+  // 2. Discover films matching user's selected genres & origins from TMDB (pages 1 & 2 in parallel)
   try {
     const genreIds = (userProfile.selectedGenres || [])
       .map((g) => (typeof g === 'number' ? g : GENRE_NAME_TO_ID[g]))
@@ -68,9 +59,8 @@ async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 15)
       .filter(Boolean)
       .join('|');
 
-    for (let p = 1; p <= 3; p++) {
-      if (candidateIdSet.size >= targetCount * 2) break;
-      const { data } = await tmdb.get('/discover/movie', {
+    const discoverPromises = [1, 2].map((p) =>
+      tmdb.get('/discover/movie', {
         params: {
           with_genres: genreIds || undefined,
           with_origin_country: countryCodes || undefined,
@@ -78,14 +68,19 @@ async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 15)
           'vote_count.gte': 40,
           page: p,
         },
-      });
+      })
+    );
 
-      (data.results || []).forEach((m) => {
-        if (!existingIds.has(m.id) && m.poster_path) {
-          candidateIdSet.add(m.id);
-        }
-      });
-    }
+    const discoverResults = await Promise.allSettled(discoverPromises);
+    discoverResults.forEach((res) => {
+      if (res.status === 'fulfilled' && res.value?.data?.results) {
+        res.value.data.results.forEach((m) => {
+          if (!existingIds.has(m.id) && m.poster_path) {
+            candidateIdSet.add(m.id);
+          }
+        });
+      }
+    });
   } catch (e) {}
 
   // 3. Query existing MongoDB profiled movies closest to this cluster's centroid
@@ -107,7 +102,7 @@ async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 15)
           (m) => m.embedding
         );
 
-        rankedCached.slice(0, 8).forEach((r) => {
+        rankedCached.slice(0, 6).forEach((r) => {
           if (r.similarity > 0.35) {
             candidateIdSet.add(r.item.tmdbId);
           }
@@ -118,8 +113,8 @@ async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 15)
 
   const selectedCandidateIds = Array.from(candidateIdSet).slice(0, targetCount * 2);
 
-  // 4. Batch profile all candidate films with AI (cached if already profiled)
-  const profiledCandidates = await movieProfilingService.batchGetOrProfileMovies(selectedCandidateIds);
+  // 4. Batch profile candidate films (fast mode)
+  const profiledCandidates = await movieProfilingService.batchGetOrProfileMovies(selectedCandidateIds, 8);
 
   // Filter candidates to ensure selected genre adherence
   const genreAdherentCandidates = userProfile.selectedGenres?.length > 0
@@ -233,6 +228,8 @@ async function recordCandidateRating({ userId, sessionId, tmdbId, rating, source
     });
 
     profile.onboardingStage = 'candidates_rated';
+    profile.cachedRecommendations = [];
+    profile.cachedRecommendationsAt = null;
     await profile.save();
   }
 
