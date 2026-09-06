@@ -6,6 +6,7 @@ import { getAuthStatus } from '../utils/auth'
 import api from '../services/api'
 import PostWatchModal from '../components/PostWatchModal'
 import UserAvatar from '../components/UserAvatar'
+import ReviewGraph from '../components/ReviewGraph'
 
 // ─── Styled Components ────────────────────────────────────────────────────────
 
@@ -442,7 +443,7 @@ const EndOfListNotice = styled.div`
 
 function Recommendations() {
   const navigate = useNavigate()
-  const { sessionId, tasteClusters } = useTasteProfile()
+  const { sessionId, tasteClusters, favoriteRatings } = useTasteProfile()
   const { user } = getAuthStatus()
   const isReturningUser = localStorage.getItem('filmism_is_returning_user') === 'true'
 
@@ -461,6 +462,7 @@ function Recommendations() {
   const [activeFilter, setActiveFilter] = useState('all')
   const [watchlist, setWatchlist] = useState([])
   const [watchedOutcomes, setWatchedOutcomes] = useState({}) // { [tmdbId]: ratingNumber }
+  const [profileRatings, setProfileRatings] = useState({}) // { [tmdbId]: ratingNumber } from onboarding/profile
   const [dismissed, setDismissed] = useState([])
   const [activeModalMovie, setActiveModalMovie] = useState(null)
   const [telemetry, setTelemetry] = useState({ hitRate: 88, totalShown: 0 })
@@ -512,9 +514,10 @@ function Recommendations() {
     const fetchInitialData = async () => {
       // 1. Fetch user's existing logs so already watchlisted/watched movies are excluded on first render
       try {
-        const [wRes, dRes] = await Promise.allSettled([
+        const [wRes, dRes, pRes] = await Promise.allSettled([
           api.get('/recommendations/watchlist', { params: { sessionId } }),
           api.get('/recommendations/diary', { params: { sessionId } }),
+          api.get('/taste-profile/me', { params: { sessionId } }),
         ])
         if (wRes.status === 'fulfilled' && Array.isArray(wRes.value.data?.watchlist)) {
           setWatchlist(wRes.value.data.watchlist.map((item) => Number(item.tmdbId || item.id)))
@@ -526,6 +529,14 @@ function Recommendations() {
             if (id) outcomes[id] = item.outcomeRating || 3
           })
           setWatchedOutcomes(outcomes)
+        }
+        if (pRes.status === 'fulfilled' && pRes.value.data?.tasteProfile?.favorites) {
+          const pRatings = {}
+          pRes.value.data.tasteProfile.favorites.forEach((item) => {
+            const id = Number(item.tmdbId || item.id)
+            if (id && item.rating) pRatings[id] = item.rating
+          })
+          setProfileRatings(pRatings)
         }
       } catch (e) {
         // silent fallback
@@ -647,6 +658,12 @@ function Recommendations() {
     )
   })
 
+  const allRatings = {
+    ...(favoriteRatings || {}),
+    ...profileRatings,
+    ...watchedOutcomes,
+  }
+
   return (
     <>
       {activeModalMovie && (
@@ -705,6 +722,9 @@ function Recommendations() {
               </ClustersRow>
             )}
           </ProfilePanel>
+
+          {/* Review Graph showing distribution of Not for me, Okay, Good, Great */}
+          <ReviewGraph ratings={allRatings} />
 
           {filterOptions.length > 1 && (
             <FilterBar>
