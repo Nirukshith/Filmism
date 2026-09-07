@@ -97,37 +97,16 @@ const getSimilarProfiledMovies = async (req, res, next) => {
   }
 };
 
+const { MOVIE_VECTOR_INDEX_DEF } = require('../config/atlasVectorIndexes');
+
 /**
  * GET /api/movies/atlas-vector-index-def
  * Return MongoDB Atlas Vector Search configuration JSON.
  */
 const getAtlasIndexDefinition = (req, res) => {
-  const indexDefinition = {
-    name: 'movie_vector_index',
-    type: 'vectorSearch',
-    definition: {
-      fields: [
-        {
-          type: 'vector',
-          path: 'embedding',
-          numDimensions: 768, // or 1536 depending on model
-          similarity: 'cosine',
-        },
-        {
-          type: 'filter',
-          path: 'isProfiled',
-        },
-        {
-          type: 'filter',
-          path: 'genres',
-        },
-      ],
-    },
-  };
-
   res.json({
     instructions: 'Create this Vector Search index on the "movieprofiles" collection in MongoDB Atlas under the Search / Vector Search tab.',
-    indexDefinition,
+    indexDefinition: MOVIE_VECTOR_INDEX_DEF,
   });
 };
 

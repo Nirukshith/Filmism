@@ -65,6 +65,11 @@ function rankByCosineSimilarity(targetVector, items, getVectorFn = (item) => ite
     .sort((a, b) => b.similarity - a.similarity);
 }
 
+const {
+  MOVIE_VECTOR_INDEX_DEF,
+  TASTE_PROFILE_VECTOR_INDEX_DEF,
+} = require('../config/atlasVectorIndexes');
+
 /**
  * Build MongoDB Atlas $vectorSearch aggregation pipeline stage.
  * Index name in Atlas: "movie_vector_index"
@@ -76,6 +81,7 @@ function buildAtlasVectorSearchPipeline({
   numCandidates = 100,
   limit = 20,
   filter = null,
+  project = null,
 }) {
   const vectorSearchStage = {
     $vectorSearch: {
@@ -91,26 +97,71 @@ function buildAtlasVectorSearchPipeline({
     vectorSearchStage.$vectorSearch.filter = filter;
   }
 
+  const projectStage = project || {
+    tmdbId: 1,
+    title: 1,
+    releaseYear: 1,
+    posterPath: 1,
+    backdropPath: 1,
+    overview: 1,
+    genres: 1,
+    originCountries: 1,
+    director: 1,
+    cast: 1,
+    profile: 1,
+    aiSummary: 1,
+    similarityScore: { $meta: 'vectorSearchScore' },
+  };
+
   return [
     vectorSearchStage,
     {
-      $project: {
-        tmdbId: 1,
-        title: 1,
-        releaseYear: 1,
-        posterPath: 1,
-        backdropPath: 1,
-        overview: 1,
-        genres: 1,
-        originCountries: 1,
-        director: 1,
-        cast: 1,
-        profile: 1,
-        aiSummary: 1,
-        similarityScore: { $meta: 'vectorSearchScore' },
-      },
+      $project: projectStage,
     },
   ];
+}
+
+/**
+ * Build MongoDB Atlas $vectorSearch aggregation pipeline for User Taste Profiles ("Cinephile Twin").
+ * Searches against globalCentroid where matchingEnabled: true.
+ */
+function buildTasteProfileVectorSearchPipeline({
+  queryVector,
+  excludeUserId = null,
+  limit = 20,
+  numCandidates = 100,
+  filter = null,
+}) {
+  const baseFilter = {
+    matchingEnabled: true,
+    onboardingStage: 'complete',
+  };
+
+  if (excludeUserId) {
+    baseFilter.userId = { $ne: excludeUserId };
+  }
+
+  const combinedFilter = filter ? { ...baseFilter, ...filter } : baseFilter;
+
+  return buildAtlasVectorSearchPipeline({
+    queryVector,
+    path: 'globalCentroid',
+    index: 'taste_profile_vector_index',
+    numCandidates,
+    limit,
+    filter: combinedFilter,
+    project: {
+      userId: 1,
+      onboardingStage: 1,
+      matchingEnabled: 1,
+      tasteClusters: 1,
+      favorites: 1,
+      selectedGenres: 1,
+      selectedOrigins: 1,
+      globalCentroid: 1,
+      similarityScore: { $meta: 'vectorSearchScore' },
+    },
+  });
 }
 
 module.exports = {
@@ -118,4 +169,8 @@ module.exports = {
   calculateCentroid,
   rankByCosineSimilarity,
   buildAtlasVectorSearchPipeline,
+  buildTasteProfileVectorSearchPipeline,
+  MOVIE_VECTOR_INDEX_DEF,
+  TASTE_PROFILE_VECTOR_INDEX_DEF,
 };
+

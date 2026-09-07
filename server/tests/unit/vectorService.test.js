@@ -3,6 +3,9 @@ const {
   calculateCentroid,
   rankByCosineSimilarity,
   buildAtlasVectorSearchPipeline,
+  buildTasteProfileVectorSearchPipeline,
+  MOVIE_VECTOR_INDEX_DEF,
+  TASTE_PROFILE_VECTOR_INDEX_DEF,
 } = require('../../services/vectorService');
 
 describe('Vector Service Unit Tests', () => {
@@ -90,4 +93,48 @@ describe('Vector Service Unit Tests', () => {
       expect(pipeline[1].$project.similarityScore).toBeDefined();
     });
   });
+
+  describe('buildTasteProfileVectorSearchPipeline', () => {
+    it('should construct a valid pipeline targeting taste_profile_vector_index with matchingEnabled filter', () => {
+      const pipeline = buildTasteProfileVectorSearchPipeline({
+        queryVector: [0.5, 0.5],
+        excludeUserId: 'user_123',
+        limit: 5,
+      });
+
+      expect(pipeline).toHaveLength(2);
+      expect(pipeline[0].$vectorSearch.index).toBe('taste_profile_vector_index');
+      expect(pipeline[0].$vectorSearch.path).toBe('globalCentroid');
+      expect(pipeline[0].$vectorSearch.filter).toEqual({
+        matchingEnabled: true,
+        onboardingStage: 'complete',
+        userId: { $ne: 'user_123' },
+      });
+      expect(pipeline[1].$project.userId).toBe(1);
+      expect(pipeline[1].$project.tasteClusters).toBe(1);
+      expect(pipeline[1].$project.similarityScore).toEqual({ $meta: 'vectorSearchScore' });
+    });
+  });
+
+  describe('Atlas Index Definitions', () => {
+    it('should provide valid MOVIE_VECTOR_INDEX_DEF and TASTE_PROFILE_VECTOR_INDEX_DEF structures', () => {
+      expect(MOVIE_VECTOR_INDEX_DEF.name).toBe('movie_vector_index');
+      expect(MOVIE_VECTOR_INDEX_DEF.definition.fields).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: 'embedding', type: 'vector', similarity: 'cosine' }),
+        ])
+      );
+
+      expect(TASTE_PROFILE_VECTOR_INDEX_DEF.name).toBe('taste_profile_vector_index');
+      expect(TASTE_PROFILE_VECTOR_INDEX_DEF.collectionName).toBe('usertasteprofiles');
+      expect(TASTE_PROFILE_VECTOR_INDEX_DEF.definition.fields).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: 'globalCentroid', type: 'vector', similarity: 'cosine' }),
+          expect.objectContaining({ path: 'matchingEnabled', type: 'filter' }),
+          expect.objectContaining({ path: 'onboardingStage', type: 'filter' }),
+        ])
+      );
+    });
+  });
 });
+
