@@ -5,9 +5,23 @@ const bcrypt = require('bcryptjs')
 const sendOtpEmail = require('../utils/sendEmail')
 const { mapNamesToIds, mapIdsToNames } = require('../utils/genreMap')         
 
-// Generate JWT token
+// Generate JWT token (7-day validity)
 const generateToken = (id, tasteProfileComplete = false) => {
-  return jwt.sign({ id, tasteProfileComplete: !!tasteProfileComplete }, process.env.JWT_SECRET, { expiresIn: '30d' })
+  return jwt.sign({ id, tasteProfileComplete: !!tasteProfileComplete }, process.env.JWT_SECRET, { expiresIn: '7d' })
+}
+
+// Dummy hash for constant-time password comparison to prevent timing attacks
+const DUMMY_HASH = '$2a$10$e8wF3Qv1mR0x9wGqjM1G4.K5d1K3k5k5k5k5k5k5k5k5k5k5k5k5k'
+
+// Helper to set secure httpOnly cookie on response
+const sendTokenCookie = (res, token) => {
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  })
 }
 
 // Validate password strength: min 8 chars, 1 uppercase, 1 special char
@@ -25,7 +39,7 @@ const validatePasswordStrength = (password) => {
 }
 
 // ── POST /api/auth/register ──────────────────────────────────────────────────
-const registerUser = async (req, res) => {
+const registerUser = async (req, res, next) => {
   const { firstName, lastName, email, password } = req.body
 
   try {
@@ -44,7 +58,26 @@ const registerUser = async (req, res) => {
     // Check if user already exists
     const userExists = await User.findOne({ email: normalizedEmail })
     if (userExists) {
-      return res.status(400).json({ message: 'An account with this email already exists' })
+      if (!userExists.isVerified) {
+        // Refresh OTP for unverified user and send email
+        const otp = Math.floor(100000 + Math.random() * 900000).toString()
+        userExists.firstName = firstName.trim()
+        userExists.lastName = lastName.trim()
+        userExists.password = password // pre-save will rehash
+        userExists.otp = await bcrypt.hash(otp, 10)
+        userExists.otpExpiry = Date.now() + 5 * 60 * 1000
+        userExists.otpAttempts = 0
+        userExists.otpLastSentAt = Date.now()
+        await userExists.save()
+        await sendOtpEmail(userExists.email, otp)
+      }
+
+      // Return uniform message to prevent account enumeration
+      return res.status(200).json({
+        message: 'If this email is not yet registered, a verification code has been sent to your email.',
+        email: normalizedEmail,
+        tasteProfileComplete: false,
+      })
     }
 
     // Generate OTP
@@ -59,6 +92,8 @@ const registerUser = async (req, res) => {
       password,
       otp: hashedOtp,
       otpExpiry: Date.now() + 5 * 60 * 1000, // 5 min
+      otpAttempts: 0,
+      otpLastSentAt: Date.now(),
       isVerified: false,
       tasteProfileComplete: false,
     })
@@ -73,13 +108,12 @@ const registerUser = async (req, res) => {
       })
     }
   } catch (error) {
-    console.error('REGISTER ERROR:', error.message)
-    res.status(500).json({ message: error.message })
+    next(error)
   }
 }
 
 // ── POST /api/auth/verify-otp ────────────────────────────────────────────────
-const verifyOtp = async (req, res) => {
+const verifyOtp = async (req, res, next) => {
   const { email, otp } = req.body
 
   try {
@@ -89,27 +123,43 @@ const verifyOtp = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim()
     const user = await User.findOne({ email: normalizedEmail })
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+    if (!user || user.isVerified || !user.otp || !user.otpExpiry || user.otpExpiry < Date.now()) {
+      return res.status(400).json({ message: 'Invalid or expired OTP. Please request a new one.' })
     }
 
-    if (user.isVerified) {
-      return res.status(400).json({ message: 'User is already verified' })
-    }
-
-    if (!user.otp || !user.otpExpiry || user.otpExpiry < Date.now()) {
-      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' })
+    if (user.otpAttempts >= 5) {
+      user.otp = undefined
+      user.otpExpiry = undefined
+      user.otpAttempts = 0
+      await user.save()
+      return res.status(400).json({ message: 'Too many incorrect OTP attempts. Your code has been invalidated. Please request a new one.' })
     }
 
     const isMatch = await bcrypt.compare(otp, user.otp)
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid OTP' })
+      user.otpAttempts = (user.otpAttempts || 0) + 1
+      if (user.otpAttempts >= 5) {
+        user.otp = undefined
+        user.otpExpiry = undefined
+        user.otpAttempts = 0
+        await user.save()
+        return res.status(400).json({ message: 'Too many incorrect OTP attempts. Your code has been invalidated. Please request a new one.' })
+      }
+      await user.save()
+      const remainingAttempts = 5 - user.otpAttempts
+      return res.status(400).json({
+        message: `Invalid OTP. ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining.`,
+      })
     }
 
     user.isVerified = true
     user.otp = undefined
     user.otpExpiry = undefined
+    user.otpAttempts = 0
     await user.save()
+
+    const token = generateToken(user._id, user.tasteProfileComplete)
+    sendTokenCookie(res, token)
 
     res.json({
       _id:       user._id,
@@ -118,48 +168,51 @@ const verifyOtp = async (req, res) => {
       email:     user.email,
       profilePicture: user.profilePicture || null,
       tasteProfileComplete: user.tasteProfileComplete || false,
-      token:     generateToken(user._id, user.tasteProfileComplete),
+      token,
       selectedCinemas: user.selectedCinemas,
       selectedGenres: mapIdsToNames(user.selectedGenres),
       selectedPosters: user.selectedPosters,
       aestheticProfile: user.aestheticProfile,
     })
   } catch (error) {
-    console.error('VERIFY OTP ERROR:', error.message)
-    res.status(500).json({ message: error.message })
+    next(error)
   }
 }
 
 // ── POST /api/auth/resend-otp ────────────────────────────────────────────────
-const resendOtp = async (req, res) => {
+const resendOtp = async (req, res, next) => {
   const { email } = req.body
 
   try {
     const normalizedEmail = email?.toLowerCase().trim()
     const user = await User.findOne({ email: normalizedEmail })
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+
+    if (user && !user.isVerified) {
+      // Check server-side 60s cooldown
+      if (user.otpLastSentAt && (Date.now() - new Date(user.otpLastSentAt).getTime() < 60 * 1000)) {
+        const remainingSeconds = Math.ceil((60 * 1000 - (Date.now() - new Date(user.otpLastSentAt).getTime())) / 1000)
+        return res.status(429).json({ message: `Please wait ${remainingSeconds}s before requesting a new code.` })
+      }
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString()
+      user.otp = await bcrypt.hash(otp, 10)
+      user.otpExpiry = Date.now() + 5 * 60 * 1000
+      user.otpAttempts = 0
+      user.otpLastSentAt = Date.now()
+      await user.save()
+
+      await sendOtpEmail(user.email, otp)
     }
-    if (user.isVerified) {
-      return res.status(400).json({ message: 'User is already verified' })
-    }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString()
-    user.otp = await bcrypt.hash(otp, 10)
-    user.otpExpiry = Date.now() + 5 * 60 * 1000
-    await user.save()
-
-    await sendOtpEmail(user.email, otp)
-
-    res.json({ message: 'A new OTP has been sent to your email.' })
+    // Always return uniform 200 message to prevent account enumeration
+    res.json({ message: 'If an unverified account exists with this email, a new OTP has been sent.' })
   } catch (error) {
-    console.error('RESEND OTP ERROR:', error.message)
-    res.status(500).json({ message: error.message })
+    next(error)
   }
 }
 
 // ── POST /api/auth/login ─────────────────────────────────────────────────────
-const loginUser = async (req, res) => {
+const loginUser = async (req, res, next) => {
   const { email, password } = req.body
 
   try {
@@ -170,34 +223,41 @@ const loginUser = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim()
     const user = await User.findOne({ email: normalizedEmail })
 
-    if (user && !user.isVerified) {
+    // Constant-time password comparison to eliminate timing attacks
+    const hashToCompare = user ? user.password : DUMMY_HASH
+    const isMatch = await bcrypt.compare(password, hashToCompare)
+
+    if (!user || !isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' })
+    }
+
+    if (!user.isVerified) {
       return res.status(401).json({ message: 'Please verify your email before logging in' })
     }
 
-    if (user && (await user.matchPassword(password))) {
-      res.json({
-        _id:       user._id,
-        firstName: user.firstName,
-        lastName:  user.lastName,
-        email:     user.email,
-        profilePicture: user.profilePicture || null,
-        tasteProfileComplete: user.tasteProfileComplete || false,
-        token:     generateToken(user._id, user.tasteProfileComplete),
-        selectedCinemas: user.selectedCinemas,
-        selectedGenres: mapIdsToNames(user.selectedGenres),
-        selectedPosters: user.selectedPosters,
-        aestheticProfile: user.aestheticProfile,
-      })
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' })
-    }
+    const token = generateToken(user._id, user.tasteProfileComplete)
+    sendTokenCookie(res, token)
+
+    res.json({
+      _id:       user._id,
+      firstName: user.firstName,
+      lastName:  user.lastName,
+      email:     user.email,
+      profilePicture: user.profilePicture || null,
+      tasteProfileComplete: user.tasteProfileComplete || false,
+      token,
+      selectedCinemas: user.selectedCinemas,
+      selectedGenres: mapIdsToNames(user.selectedGenres),
+      selectedPosters: user.selectedPosters,
+      aestheticProfile: user.aestheticProfile,
+    })
   } catch (error) {
-    res.status(500).json({ message: error.message })
+    next(error)
   }
 }
 
 // ── PUT /api/auth/profile ────────────────────────────────────────────────────
-const updateTasteProfile = async (req, res) => {
+const updateTasteProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id)
 
@@ -231,13 +291,32 @@ const updateTasteProfile = async (req, res) => {
       res.status(404).json({ message: 'User not found' })
     }
   } catch (error) {
-    console.error('UPDATE PROFILE ERROR:', error.message)
-    res.status(500).json({ message: error.message })
+    next(error)
   }
 }
 
+// Validate profile picture format (data URL or http URL) and size (< 1MB)
+const validateProfilePicture = (picture) => {
+  if (picture === null || picture === '') return null // clearing avatar is allowed
+  if (typeof picture !== 'string') return 'Invalid profile picture format.'
+
+  const isDataUrl = /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(picture)
+  const isHttpUrl = /^https?:\/\/.+/i.test(picture)
+
+  if (!isDataUrl && !isHttpUrl) {
+    return 'Profile picture must be a valid image format (PNG, JPEG, WebP, GIF).'
+  }
+
+  // Max 1.5MB character limit for base64 encoded ~1MB image
+  if (picture.length > 1.5 * 1024 * 1024) {
+    return 'Profile picture exceeds the maximum allowed size of 1MB.'
+  }
+
+  return null
+}
+
 // ── PATCH /api/auth/profile ──────────────────────────────────────────────────
-const updateProfile = async (req, res) => {
+const updateProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id)
     if (!user) return res.status(404).json({ message: 'User not found' })
@@ -249,9 +328,13 @@ const updateProfile = async (req, res) => {
     if (firstName) user.firstName = firstName.trim()
     if (lastName)  user.lastName  = lastName.trim()
 
-    // ── Profile picture update ───────────────────────────
+    // ── Profile picture update (validated size & MIME) ───
     if (profilePicture !== undefined) {
-      user.profilePicture = profilePicture
+      const picError = validateProfilePicture(profilePicture)
+      if (picError) {
+        return res.status(400).json({ message: picError })
+      }
+      user.profilePicture = profilePicture || null
     }
 
     // ── Email change → stage as pendingEmail + send OTP ──
@@ -264,6 +347,8 @@ const updateProfile = async (req, res) => {
       user.pendingEmail = normalizedEmail
       user.otp = await bcrypt.hash(otp, 10)
       user.otpExpiry = Date.now() + 5 * 60 * 1000
+      user.otpAttempts = 0
+      user.otpLastSentAt = Date.now()
       await sendOtpEmail(normalizedEmail, otp)
       emailChangePending = true
     }
@@ -284,6 +369,8 @@ const updateProfile = async (req, res) => {
 
     // Issue fresh token (important after password change)
     const token = generateToken(updated._id, updated.tasteProfileComplete)
+    sendTokenCookie(res, token)
+
     const userData = {
       _id: updated._id,
       firstName: updated.firstName,
@@ -303,13 +390,12 @@ const updateProfile = async (req, res) => {
         : 'Profile updated successfully.',
     })
   } catch (error) {
-    console.error('UPDATE PROFILE ERROR:', error.message)
-    res.status(500).json({ message: error.message })
+    next(error)
   }
 }
 
 // ── POST /api/auth/verify-email-change ───────────────────────────────────────
-const verifyEmailChange = async (req, res) => {
+const verifyEmailChange = async (req, res, next) => {
   try {
     const { otp } = req.body
     const user = await User.findById(req.user._id)
@@ -321,17 +407,43 @@ const verifyEmailChange = async (req, res) => {
     if (user.otpExpiry < Date.now()) {
       return res.status(400).json({ message: 'OTP has expired. Please request the change again.' })
     }
+
+    if (user.otpAttempts >= 5) {
+      user.otp = undefined
+      user.otpExpiry = undefined
+      user.otpAttempts = 0
+      await user.save()
+      return res.status(400).json({ message: 'Too many incorrect attempts. Code invalidated. Please request the change again.' })
+    }
+
     const match = await bcrypt.compare(otp, user.otp)
-    if (!match) return res.status(400).json({ message: 'Invalid OTP.' })
+    if (!match) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1
+      if (user.otpAttempts >= 5) {
+        user.otp = undefined
+        user.otpExpiry = undefined
+        user.otpAttempts = 0
+        await user.save()
+        return res.status(400).json({ message: 'Too many incorrect attempts. Code invalidated. Please request the change again.' })
+      }
+      await user.save()
+      const remainingAttempts = 5 - user.otpAttempts
+      return res.status(400).json({
+        message: `Invalid OTP. ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining.`,
+      })
+    }
 
     // Commit the email change
     user.email = user.pendingEmail
     user.pendingEmail = null
     user.otp = undefined
     user.otpExpiry = undefined
+    user.otpAttempts = 0
     const updated = await user.save()
 
     const token = generateToken(updated._id, updated.tasteProfileComplete)
+    sendTokenCookie(res, token)
+
     const userData = {
       _id: updated._id,
       firstName: updated.firstName,
@@ -344,13 +456,12 @@ const verifyEmailChange = async (req, res) => {
 
     res.json({ ...userData, message: 'Email updated successfully.' })
   } catch (error) {
-    console.error('VERIFY EMAIL CHANGE ERROR:', error.message)
-    res.status(500).json({ message: error.message })
+    next(error)
   }
 }
 
 // ── POST /api/auth/reset-taste ──────────────────────────────────────────────
-const resetTasteProfile = async (req, res) => {
+const resetTasteProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id)
     if (!user) return res.status(404).json({ message: 'User not found' })
@@ -366,6 +477,8 @@ const resetTasteProfile = async (req, res) => {
     await UserTasteProfile.deleteMany({ userId: user._id })
 
     const token = generateToken(user._id, false)
+    sendTokenCookie(res, token)
+
     const userData = {
       _id: user._id,
       firstName: user.firstName,
@@ -382,18 +495,30 @@ const resetTasteProfile = async (req, res) => {
       ...userData,
     })
   } catch (error) {
-    console.error('RESET TASTE ERROR:', error.message)
-    res.status(500).json({ message: error.message })
+    next(error)
   }
+}
+
+// ── POST /api/auth/logout ───────────────────────────────────────────────────
+const logoutUser = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  })
+  res.json({ success: true, message: 'Logged out successfully' })
 }
 
 module.exports = {
   registerUser,
   loginUser,
+  logoutUser,
   updateTasteProfile,
   verifyOtp,
   resendOtp,
   updateProfile,
   verifyEmailChange,
   resetTasteProfile,
+  sendTokenCookie,
 }

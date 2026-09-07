@@ -5,7 +5,9 @@ const GEMINI_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || 
 const OPENAI_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const OPENROUTER_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
 
-// Initialize clients if keys exist
+const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS, 10) || 10000;
+
+// Initialize clients if keys exist with timeout and retries
 let geminiClient = null;
 let openaiClient = null;
 let openrouterClient = null;
@@ -15,6 +17,8 @@ if (OPENROUTER_KEY) {
     openrouterClient = new OpenAI({
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey: OPENROUTER_KEY,
+      timeout: AI_TIMEOUT_MS,
+      maxRetries: 2,
       defaultHeaders: {
         'HTTP-Referer': 'https://filmism.app',
         'X-Title': 'Filmism',
@@ -35,11 +39,59 @@ if (GEMINI_KEY) {
 
 if (OPENAI_KEY) {
   try {
-    openaiClient = new OpenAI({ apiKey: OPENAI_KEY });
+    openaiClient = new OpenAI({
+      apiKey: OPENAI_KEY,
+      timeout: AI_TIMEOUT_MS,
+      maxRetries: 2,
+    });
   } catch (err) {
     console.warn('OpenAI initialization warning:', err.message);
   }
 }
+
+/**
+ * Execute an async operation bounded by a strict timeout.
+ */
+async function executeWithTimeout(promiseFactory, timeoutMs = AI_TIMEOUT_MS, label = 'AI Operation') {
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`${label} timed out after ${timeoutMs}ms`);
+      err.isTimeout = true;
+      reject(err);
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promiseFactory(), timeoutPromise]);
+    clearTimeout(timer);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+/**
+ * Retry helper for transient failures with exponential backoff.
+ */
+async function retryWithBackoff(fn, maxRetries = 1, baseDelayMs = 400, label = 'AI Operation') {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.warn(`[${label}] Transient failure (${err.message}). Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 
 /**
  * Fallback heuristic profiling for offline development or missing API keys.
@@ -245,16 +297,27 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
   if (openrouterClient) {
     try {
       const modelName = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
-      const completion = await openrouterClient.chat.completions.create({
-        model: modelName,
-        max_tokens: 1000,
-        messages: [
-          { role: 'system', content: 'You are an expert film analyst providing structured JSON cinematic profiles.' },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      });
+      const completion = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () =>
+              openrouterClient.chat.completions.create({
+                model: modelName,
+                max_tokens: 1000,
+                messages: [
+                  { role: 'system', content: 'You are an expert film analyst providing structured JSON cinematic profiles.' },
+                  { role: 'user', content: prompt },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+              }),
+            1,
+            500,
+            'OpenRouter Film Analysis'
+          ),
+        AI_TIMEOUT_MS,
+        'OpenRouter Film Analysis'
+      );
 
       const responseText = completion.choices[0].message.content.trim();
       const parsed = JSON.parse(responseText);
@@ -276,28 +339,50 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
         },
       });
 
-      const result = await model.generateContent(prompt);
+      const result = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () => model.generateContent(prompt),
+            1,
+            500,
+            'Gemini Film Analysis'
+          ),
+        AI_TIMEOUT_MS,
+        'Gemini Film Analysis'
+      );
+
       const responseText = result.response.text().trim();
       const parsed = JSON.parse(responseText);
       return sanitizeProfile(parsed, movieData);
     } catch (err) {
-      // Gemini API error or invalid key, fallback silently
+      console.warn('Gemini analysis warning:', err.message);
     }
   }
 
   // 3. Try OpenAI
   if (openaiClient) {
     try {
-      const completion = await openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
-        max_tokens: 1000,
-        messages: [
-          { role: 'system', content: 'You are an expert film analyst providing structured JSON cinematic profiles.' },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      });
+      const completion = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () =>
+              openaiClient.chat.completions.create({
+                model: 'gpt-4o-mini',
+                max_tokens: 1000,
+                messages: [
+                  { role: 'system', content: 'You are an expert film analyst providing structured JSON cinematic profiles.' },
+                  { role: 'user', content: prompt },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+              }),
+            1,
+            500,
+            'OpenAI Film Analysis'
+          ),
+        AI_TIMEOUT_MS,
+        'OpenAI Film Analysis'
+      );
 
       const responseText = completion.choices[0].message.content.trim();
       const parsed = JSON.parse(responseText);
@@ -308,7 +393,7 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
   }
 
   // 4. Fallback to rich heuristic profiling
-  console.info(`Using heuristic cinematic profiling for "${movieData.title}" (no active AI API key)`);
+  console.info(`Using heuristic cinematic profiling for "${movieData.title}" (AI providers unavailable/timed out)`);
   return generateHeuristicProfile(movieData);
 }
 
@@ -320,7 +405,11 @@ async function createEmbedding(profileText) {
   if (geminiClient) {
     try {
       const model = geminiClient.getGenerativeModel({ model: 'text-embedding-004' });
-      const result = await model.embedContent(profileText);
+      const result = await executeWithTimeout(
+        () => retryWithBackoff(() => model.embedContent(profileText), 1, 400, 'Gemini Embedding'),
+        AI_TIMEOUT_MS,
+        'Gemini Embedding'
+      );
       if (result?.embedding?.values) {
         return {
           embedding: result.embedding.values,
@@ -330,7 +419,11 @@ async function createEmbedding(profileText) {
     } catch (err) {
       try {
         const modelFallback = geminiClient.getGenerativeModel({ model: 'embedding-001' });
-        const resultFallback = await modelFallback.embedContent(profileText);
+        const resultFallback = await executeWithTimeout(
+          () => retryWithBackoff(() => modelFallback.embedContent(profileText), 1, 400, 'Gemini Embedding Fallback'),
+          AI_TIMEOUT_MS,
+          'Gemini Embedding Fallback'
+        );
         if (resultFallback?.embedding?.values) {
           return {
             embedding: resultFallback.embedding.values,
@@ -346,10 +439,21 @@ async function createEmbedding(profileText) {
   // 2. Try OpenAI text-embedding-3-small
   if (openaiClient) {
     try {
-      const response = await openaiClient.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: profileText,
-      });
+      const response = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () =>
+              openaiClient.embeddings.create({
+                model: 'text-embedding-3-small',
+                input: profileText,
+              }),
+            1,
+            400,
+            'OpenAI Embedding'
+          ),
+        AI_TIMEOUT_MS,
+        'OpenAI Embedding'
+      );
       if (response?.data?.[0]?.embedding) {
         return {
           embedding: response.data[0].embedding,

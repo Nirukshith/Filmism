@@ -9,7 +9,7 @@ const tmdb = require('../services/tmdbService');
  * POST /api/recommendations/candidates
  * Retrieve candidate pool rounds for user feedback (DeepDive page).
  */
-const getCandidatePool = async (req, res) => {
+const getCandidatePool = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const { sessionId } = req.body;
@@ -32,8 +32,7 @@ const getCandidatePool = async (req, res) => {
       clusters: profile.tasteClusters,
     });
   } catch (error) {
-    console.error('Error generating candidate pool:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -41,7 +40,7 @@ const getCandidatePool = async (req, res) => {
  * POST /api/recommendations/rate-candidate
  * Submit user rating for a candidate film (updates cluster & profile weights).
  */
-const rateCandidateFilm = async (req, res) => {
+const rateCandidateFilm = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const { sessionId, tmdbId, rating, sourceClusterId } = req.body;
@@ -63,8 +62,7 @@ const rateCandidateFilm = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error rating candidate:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -72,7 +70,7 @@ const rateCandidateFilm = async (req, res) => {
  * GET /api/recommendations/ranked
  * Fetch final ranked recommendations with "Why you'll like this" explanations and diversity guardrails.
  */
-const getRankedRecommendations = async (req, res) => {
+const getRankedRecommendations = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const sessionId = req.query.sessionId;
@@ -105,8 +103,7 @@ const getRankedRecommendations = async (req, res) => {
       aiSynthesis: profile.aiSynthesis,
     });
   } catch (error) {
-    console.error('Error getting recommendations:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -114,7 +111,7 @@ const getRankedRecommendations = async (req, res) => {
  * POST /api/recommendations/action
  * Log interaction action (shown, watchlisted, dismissed, watched) and update intent weights.
  */
-const recordAction = async (req, res) => {
+const recordAction = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const { sessionId, tmdbId, title, sourceClusterId, sourceClusterName, matchScore, action } = req.body;
@@ -136,8 +133,7 @@ const recordAction = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error recording action:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -145,7 +141,7 @@ const recordAction = async (req, res) => {
  * POST /api/recommendations/outcome
  * Record post-watch outcome verdict and apply high-signal profile learning.
  */
-const recordOutcome = async (req, res) => {
+const recordOutcome = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const { sessionId, tmdbId, outcomeRating, sourceClusterId } = req.body;
@@ -164,8 +160,7 @@ const recordOutcome = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error recording outcome:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -173,7 +168,7 @@ const recordOutcome = async (req, res) => {
  * GET /api/recommendations/telemetry-stats
  * Get recommendation quality metrics and hit-rate telemetry.
  */
-const getTelemetryStats = async (req, res) => {
+const getTelemetryStats = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const sessionId = req.query.sessionId;
@@ -185,8 +180,7 @@ const getTelemetryStats = async (req, res) => {
       stats,
     });
   } catch (error) {
-    console.error('Error fetching telemetry stats:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -194,7 +188,7 @@ const getTelemetryStats = async (req, res) => {
  * GET /api/recommendations/watchlist
  * Return all films the user has watchlisted, enriched with TMDB poster data.
  */
-const getWatchlist = async (req, res) => {
+const getWatchlist = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const sessionId = req.query.sessionId;
@@ -253,8 +247,7 @@ const getWatchlist = async (req, res) => {
 
     res.json({ success: true, watchlist });
   } catch (error) {
-    console.error('Error fetching watchlist:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -262,7 +255,7 @@ const getWatchlist = async (req, res) => {
  * GET /api/recommendations/diary
  * Return all films the user has marked as watched, with rating + TMDB poster data.
  */
-const getDiary = async (req, res) => {
+const getDiary = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const sessionId = req.query.sessionId;
@@ -313,8 +306,7 @@ const getDiary = async (req, res) => {
 
     res.json({ success: true, diary });
   } catch (error) {
-    console.error('Error fetching diary:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 

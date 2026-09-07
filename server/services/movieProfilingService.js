@@ -3,42 +3,47 @@ const MovieProfile = require('../models/movieProfileModel');
 const aiService = require('./aiService');
 const vectorService = require('./vectorService');
 
+const { movieDetailCache, getOrSet } = require('./cacheService');
+
 /**
  * Fetch rich metadata from TMDB for a given movie ID (including director, cast, keywords).
+ * Cached in memory for 6 hours.
  */
 async function fetchTmdbMovieDetails(tmdbId) {
-  const { data } = await tmdb.get(`/movie/${tmdbId}`, {
-    params: { append_to_response: 'credits,keywords' },
+  return getOrSet(movieDetailCache, `movie:full:${tmdbId}`, async () => {
+    const { data } = await tmdb.get(`/movie/${tmdbId}`, {
+      params: { append_to_response: 'credits,keywords' },
+    });
+
+    const director =
+      data.credits?.crew?.find((c) => c.job === 'Director')?.name ||
+      data.credits?.crew?.find((c) => c.department === 'Directing')?.name ||
+      'Unknown';
+
+    const cast = (data.credits?.cast || []).slice(0, 8).map((c) => c.name);
+
+    // TMDB keywords may come in `keywords.keywords` or `keywords.results`
+    const rawKeywords = data.keywords?.keywords || data.keywords?.results || [];
+    const keywords = rawKeywords.map((k) => k.name);
+
+    const releaseYear = data.release_date ? parseInt(data.release_date.split('-')[0], 10) : undefined;
+    const genres = (data.genres || []).map((g) => g.name);
+    const originCountries = data.origin_country || (data.production_countries || []).map((c) => c.iso_3166_1);
+
+    return {
+      tmdbId: data.id,
+      title: data.title,
+      releaseYear,
+      posterPath: data.poster_path,
+      backdropPath: data.backdrop_path,
+      overview: data.overview,
+      genres,
+      originCountries,
+      director,
+      cast,
+      keywords,
+    };
   });
-
-  const director =
-    data.credits?.crew?.find((c) => c.job === 'Director')?.name ||
-    data.credits?.crew?.find((c) => c.department === 'Directing')?.name ||
-    'Unknown';
-
-  const cast = (data.credits?.cast || []).slice(0, 8).map((c) => c.name);
-
-  // TMDB keywords may come in `keywords.keywords` or `keywords.results`
-  const rawKeywords = data.keywords?.keywords || data.keywords?.results || [];
-  const keywords = rawKeywords.map((k) => k.name);
-
-  const releaseYear = data.release_date ? parseInt(data.release_date.split('-')[0], 10) : undefined;
-  const genres = (data.genres || []).map((g) => g.name);
-  const originCountries = data.origin_country || (data.production_countries || []).map((c) => c.iso_3166_1);
-
-  return {
-    tmdbId: data.id,
-    title: data.title,
-    releaseYear,
-    posterPath: data.poster_path,
-    backdropPath: data.backdrop_path,
-    overview: data.overview,
-    genres,
-    originCountries,
-    director,
-    cast,
-    keywords,
-  };
 }
 
 /**
@@ -88,8 +93,19 @@ async function getOrProfileMovie(tmdbId, forceReProfile = false, fastMode = true
     }
   }
 
-  // 2. Fetch raw details from TMDB
-  const rawData = await fetchTmdbMovieDetails(numericId);
+  // 2. Fetch raw details from TMDB with fallback protection
+  let rawData;
+  try {
+    rawData = await fetchTmdbMovieDetails(numericId);
+  } catch (err) {
+    // If TMDB is unavailable, attempt to return partial/cached profile if one exists in DB
+    const fallbackCached = await MovieProfile.findOne({ tmdbId: numericId });
+    if (fallbackCached) {
+      console.warn(`[MovieProfiling] TMDB fetch failed for movie ${numericId} (${err.message}). Using existing DB profile.`);
+      return { profile: fallbackCached, fromCache: true, degraded: true };
+    }
+    throw new Error(`Unable to profile movie ${numericId}: External movie service unavailable (${err.message})`);
+  }
 
   if (fastMode) {
     // Fast synchronous heuristic profiling for instant response

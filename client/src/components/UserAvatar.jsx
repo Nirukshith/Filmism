@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useNavigate, Link } from 'react-router-dom'
 import { getAuthStatus } from '../utils/auth'
+import { authAPI } from '../services/api'
 
 // ─── Minimalist SVG Dropdown Icons ───────────────────────────────────────────
 
@@ -217,7 +218,10 @@ function UserAvatar() {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    try {
+      await authAPI.logout()
+    } catch (e) {}
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('filmism_is_returning_user')

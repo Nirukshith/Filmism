@@ -37,6 +37,8 @@ const userSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: false },
     otp: { type: String },
     otpExpiry: { type: Date },
+    otpAttempts: { type: Number, default: 0 },
+    otpLastSentAt: { type: Date, default: null },
     profilePicture: { type: String, default: null },
 
 

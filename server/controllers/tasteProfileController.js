@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
  * POST /api/taste-profile/initialize
  * Initialize taste profile from selected genres, origins, and 20-30 favorite films.
  */
-const initializeTasteProfile = async (req, res) => {
+const initializeTasteProfile = async (req, res, next) => {
   try {
     const { genres = [], origins = [], favorites = [], sessionId } = req.body;
     const userId = req.user?._id || req.user?.id;
@@ -29,8 +29,18 @@ const initializeTasteProfile = async (req, res) => {
     });
 
     const updatedToken = userId
-      ? jwt.sign({ id: userId, tasteProfileComplete: true }, process.env.JWT_SECRET, { expiresIn: '30d' })
+      ? jwt.sign({ id: userId, tasteProfileComplete: true }, process.env.JWT_SECRET, { expiresIn: '7d' })
       : undefined;
+
+    if (updatedToken) {
+      res.cookie('token', updatedToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+    }
 
     res.json({
       success: true,
@@ -42,8 +52,7 @@ const initializeTasteProfile = async (req, res) => {
       token: updatedToken,
     });
   } catch (error) {
-    console.error('Error initializing taste profile:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -51,7 +60,7 @@ const initializeTasteProfile = async (req, res) => {
  * GET /api/taste-profile/me
  * Retrieve the active user or session taste profile.
  */
-const getUserTasteProfile = async (req, res) => {
+const getUserTasteProfile = async (req, res, next) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const sessionId = req.query.sessionId;
@@ -78,7 +87,7 @@ const getUserTasteProfile = async (req, res) => {
       tasteProfile: profile,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -86,7 +95,7 @@ const getUserTasteProfile = async (req, res) => {
  * PUT /api/taste-profile/favorite-rating
  * Update a favorite film's 5-tier rating and re-compute cluster weights.
  */
-const updateFavoriteRating = async (req, res) => {
+const updateFavoriteRating = async (req, res, next) => {
   try {
     const { tmdbId, rating, sessionId } = req.body;
     const userId = req.user?._id || req.user?.id;
@@ -135,7 +144,7 @@ const updateFavoriteRating = async (req, res) => {
       clusters: rebuilt.clusters,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -143,7 +152,7 @@ const updateFavoriteRating = async (req, res) => {
  * POST /api/taste-profile/append
  * Incrementally append new favorite films & ratings to active taste profile without resetting.
  */
-const appendTasteProfileFavorites = async (req, res) => {
+const appendTasteProfileFavorites = async (req, res, next) => {
   try {
     const { favorites = [], sessionId } = req.body;
     const userId = req.user?._id || req.user?.id;
@@ -171,8 +180,7 @@ const appendTasteProfileFavorites = async (req, res) => {
       aiSynthesis: result.aiSynthesis,
     });
   } catch (error) {
-    console.error('Error appending taste profile favorites:', error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 

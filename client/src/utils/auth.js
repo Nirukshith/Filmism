@@ -1,5 +1,5 @@
 /**
- * Parse JWT token safely on client.
+ * Parse JWT token safely on client (if token string is available).
  */
 export function parseJwt(token) {
   if (!token || typeof token !== 'string') return null;
@@ -21,42 +21,29 @@ export function parseJwt(token) {
 
 /**
  * Check active user authentication and taste profile completion status.
+ * Session token is stored securely in an httpOnly cookie;
+ * User metadata in localStorage reflects active UI state.
  */
 export function getAuthStatus() {
-  const token = localStorage.getItem('token');
-  if (!token) {
+  const storedUser = localStorage.getItem('user');
+  if (!storedUser) {
     return { isAuthenticated: false, tasteProfileComplete: false, user: null };
   }
 
-  const decoded = parseJwt(token);
+  try {
+    const user = JSON.parse(storedUser);
+    if (!user || (!user._id && !user.id)) {
+      localStorage.removeItem('user');
+      return { isAuthenticated: false, tasteProfileComplete: false, user: null };
+    }
 
-  // Check expiration if present
-  if (decoded?.exp && decoded.exp * 1000 < Date.now()) {
-    localStorage.removeItem('token');
+    return {
+      isAuthenticated: true,
+      tasteProfileComplete: !!user.tasteProfileComplete,
+      user,
+    };
+  } catch (e) {
     localStorage.removeItem('user');
     return { isAuthenticated: false, tasteProfileComplete: false, user: null };
   }
-
-  let tasteProfileComplete = false;
-  if (decoded && decoded.tasteProfileComplete !== undefined) {
-    tasteProfileComplete = !!decoded.tasteProfileComplete;
-  }
-
-  let user = null;
-  try {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      user = JSON.parse(storedUser);
-      if (user.tasteProfileComplete !== undefined) {
-        tasteProfileComplete = tasteProfileComplete || !!user.tasteProfileComplete;
-      }
-    }
-  } catch (e) {}
-
-  return {
-    isAuthenticated: true,
-    tasteProfileComplete,
-    user,
-    decoded,
-  };
 }

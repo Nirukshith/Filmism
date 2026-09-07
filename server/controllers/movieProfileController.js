@@ -5,7 +5,7 @@ const MovieProfile = require('../models/movieProfileModel');
  * GET /api/movies/profile/:tmdbId
  * Retrieve a cached movie profile or return 404 if not yet profiled.
  */
-const getMovieProfile = async (req, res) => {
+const getMovieProfile = async (req, res, next) => {
   try {
     const { tmdbId } = req.params;
     const profile = await MovieProfile.findOne({ tmdbId: Number(tmdbId) });
@@ -23,7 +23,7 @@ const getMovieProfile = async (req, res) => {
       fromCache: true,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -31,7 +31,7 @@ const getMovieProfile = async (req, res) => {
  * POST /api/movies/profile/:tmdbId
  * Profile a single movie (fetch from cache if exists, otherwise generate & persist).
  */
-const profileMovie = async (req, res) => {
+const profileMovie = async (req, res, next) => {
   try {
     const { tmdbId } = req.params;
     const forceReProfile = req.query.force === 'true';
@@ -44,7 +44,7 @@ const profileMovie = async (req, res) => {
       profile,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -53,7 +53,7 @@ const profileMovie = async (req, res) => {
  * Body: { tmdbIds: [105, 807, 335984] }
  * Profile multiple movies with caching and concurrency control.
  */
-const batchProfileMovies = async (req, res) => {
+const batchProfileMovies = async (req, res, next) => {
   try {
     const { tmdbIds } = req.body;
 
@@ -72,7 +72,7 @@ const batchProfileMovies = async (req, res) => {
       profiles,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -80,7 +80,7 @@ const batchProfileMovies = async (req, res) => {
  * GET /api/movies/similar-profiled/:tmdbId
  * Returns top semantically similar movies from the profiled database.
  */
-const getSimilarProfiledMovies = async (req, res) => {
+const getSimilarProfiledMovies = async (req, res, next) => {
   try {
     const { tmdbId } = req.params;
     const limit = parseInt(req.query.limit, 10) || 10;
@@ -93,7 +93,7 @@ const getSimilarProfiledMovies = async (req, res) => {
       results: similar,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 

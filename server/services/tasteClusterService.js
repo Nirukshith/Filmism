@@ -9,6 +9,8 @@ const GEMINI_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || 
 const OPENAI_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const OPENROUTER_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
 
+const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS, 10) || 10000;
+
 let geminiClient = null;
 let openaiClient = null;
 let openrouterClient = null;
@@ -18,6 +20,8 @@ if (OPENROUTER_KEY) {
     openrouterClient = new OpenAI({
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey: OPENROUTER_KEY,
+      timeout: AI_TIMEOUT_MS,
+      maxRetries: 2,
       defaultHeaders: {
         'HTTP-Referer': 'https://filmism.app',
         'X-Title': 'Filmism',
@@ -37,11 +41,59 @@ if (GEMINI_KEY) {
 }
 if (OPENAI_KEY) {
   try {
-    openaiClient = new OpenAI({ apiKey: OPENAI_KEY });
+    openaiClient = new OpenAI({
+      apiKey: OPENAI_KEY,
+      timeout: AI_TIMEOUT_MS,
+      maxRetries: 2,
+    });
   } catch (err) {
     console.warn('OpenAI client init warning:', err.message);
   }
 }
+
+/**
+ * Execute an async operation bounded by a strict timeout.
+ */
+async function executeWithTimeout(promiseFactory, timeoutMs = AI_TIMEOUT_MS, label = 'AI Clustering') {
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`${label} timed out after ${timeoutMs}ms`);
+      err.isTimeout = true;
+      reject(err);
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promiseFactory(), timeoutPromise]);
+    clearTimeout(timer);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+/**
+ * Retry helper for transient failures with exponential backoff.
+ */
+async function retryWithBackoff(fn, maxRetries = 1, baseDelayMs = 400, label = 'AI Clustering') {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.warn(`[${label}] Transient failure (${err.message}). Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 
 const RATING_MULTIPLIERS = {
   4: 1.4, // great
@@ -339,16 +391,27 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
   if (openrouterClient) {
     try {
       const modelName = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
-      const completion = await openrouterClient.chat.completions.create({
-        model: modelName,
-        max_tokens: 1200,
-        messages: [
-          { role: 'system', content: 'You are an expert film analyst providing structured taste clustering.' },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      });
+      const completion = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () =>
+              openrouterClient.chat.completions.create({
+                model: modelName,
+                max_tokens: 1200,
+                messages: [
+                  { role: 'system', content: 'You are an expert film analyst providing structured taste clustering.' },
+                  { role: 'user', content: prompt },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+              }),
+            1,
+            500,
+            'OpenRouter Taste Clustering'
+          ),
+        AI_TIMEOUT_MS,
+        'OpenRouter Taste Clustering'
+      );
       const parsed = JSON.parse(completion.choices[0].message.content.trim());
       if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
         return parsed;
@@ -368,28 +431,49 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
           maxOutputTokens: 1200,
         },
       });
-      const result = await model.generateContent(prompt);
+      const result = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () => model.generateContent(prompt),
+            1,
+            500,
+            'Gemini Taste Clustering'
+          ),
+        AI_TIMEOUT_MS,
+        'Gemini Taste Clustering'
+      );
       const parsed = JSON.parse(result.response.text().trim());
       if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
         return parsed;
       }
     } catch (err) {
-      // Fallback silently
+      console.warn('Gemini clustering warning:', err.message);
     }
   }
 
   if (openaiClient) {
     try {
-      const completion = await openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
-        max_tokens: 1200,
-        messages: [
-          { role: 'system', content: 'You are an expert film analyst providing structured taste clustering.' },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      });
+      const completion = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () =>
+              openaiClient.chat.completions.create({
+                model: 'gpt-4o-mini',
+                max_tokens: 1200,
+                messages: [
+                  { role: 'system', content: 'You are an expert film analyst providing structured taste clustering.' },
+                  { role: 'user', content: prompt },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+              }),
+            1,
+            500,
+            'OpenAI Taste Clustering'
+          ),
+        AI_TIMEOUT_MS,
+        'OpenAI Taste Clustering'
+      );
       const parsed = JSON.parse(completion.choices[0].message.content.trim());
       if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
         return parsed;

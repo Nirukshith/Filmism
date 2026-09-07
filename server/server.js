@@ -6,16 +6,36 @@ dotenv.config({ path: path.resolve(__dirname, '.env') })
 
 const express     = require('express')
 const cors        = require('cors')
+const helmet      = require('helmet')
+const cookieParser = require('cookie-parser')
 const connectDB   = require('./config/db')
-const { errorHandler } = require('./middleware/errorMiddleware')
+const { errorHandler, notFoundHandler } = require('./middleware/errorMiddleware')
 const movieRoutes = require('./routes/movieRoutes');
 
 const app = express()
 
-// ── Fix: allow all origins in development ──
-app.use(cors())
-app.use(express.json({ limit: '10mb' }))
-app.use(express.urlencoded({ limit: '10mb', extended: true }))
+// ── Security Headers with Helmet ──
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+)
+
+// ── Enable credentials and CORS ──
+app.use(
+  cors({
+    origin: true, // Reflect request origin to allow credentials
+    credentials: true,
+  })
+)
+app.use(cookieParser())
+app.use(express.json({ limit: '2mb' }))
+app.use(express.urlencoded({ limit: '2mb', extended: true }))
+
+// Root health check
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'Filmism server is running' })
+})
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'))
@@ -23,12 +43,11 @@ app.use('/api/movies', movieRoutes)
 app.use('/api/taste-profile', require('./routes/tasteProfileRoutes'))
 app.use('/api/recommendations', require('./routes/recommendationRoutes'))
 
-// Error handler
-app.use(errorHandler)
+// 404 handler for undefined routes
+app.use(notFoundHandler)
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Filmism server is running' })
-})
+// Centralized error handler
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 5001
 

@@ -4,18 +4,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true, // Automatically attach and manage httpOnly cookies
   headers: {
     'Content-Type': 'application/json',
   },
-})
-
-// Add token to requests if available
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
 })
 
 // Handle response errors
@@ -25,6 +17,7 @@ api.interceptors.response.use(
     const isAuthRoute = error.config?.url?.includes('/auth/')
     if (error.response?.status === 401 && !isAuthRoute) {
       localStorage.removeItem('token')
+      localStorage.removeItem('user')
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
@@ -37,6 +30,7 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
   verifyOtp: (data) => api.post('/auth/verify-otp', data),
   resendOtp: (data) => api.post('/auth/resend-otp', data),
 }

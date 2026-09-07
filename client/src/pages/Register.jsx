@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import styled from 'styled-components'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authAPI } from '../services/api'
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
@@ -289,6 +289,8 @@ const FeatureItem = styled.li`
 
 function RegisterPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
 
   const [form, setForm] = useState({
     firstName: '',
@@ -371,25 +373,31 @@ function RegisterPage() {
     return
   }
 
-  setLoading(true)
-  setOtpError('')
-  try {
-    const response = await authAPI.verifyOtp({ email: form.email, otp })
-
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token)
-      localStorage.setItem('user', JSON.stringify(response.data))
-      localStorage.removeItem('filmism_is_returning_user')
+    e.preventDefault()
+    if (!otp.trim() || otp.length !== 6) {
+      setOtpError('enter the 6-digit code')
+      return
     }
 
-    navigate('/taste')
-  } catch (err) {
-    const message = err.response?.data?.message || 'invalid or expired code'
-    setOtpError(message)
-  } finally {
-    setLoading(false)
+    setLoading(true)
+    setOtpError('')
+    try {
+      const response = await authAPI.verifyOtp({ email: form.email, otp })
+
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token)
+        localStorage.setItem('user', JSON.stringify(response.data))
+        localStorage.removeItem('filmism_is_returning_user')
+      }
+
+      navigate(returnTo || '/taste')
+    } catch (err) {
+      const message = err.response?.data?.message || 'invalid or expired code'
+      setOtpError(message)
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   const handleResendOtp = async () => {
     if (resendCooldown > 0) return
@@ -515,7 +523,7 @@ function RegisterPage() {
           <Divider><span>or</span></Divider>
 
           <LoginPrompt>
-            already have an account? <Link to="/login">log in</Link>
+            already have an account? <Link to={`/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}>log in</Link>
           </LoginPrompt>
 
         </Form>

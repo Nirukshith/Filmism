@@ -7,6 +7,8 @@ import api from '../services/api'
 import RatingControl from '../components/RatingControl'
 import TasteClustersView from '../components/TasteClustersView'
 import OriginLandmarkIcon from '../components/OriginLandmarkIcon'
+import AuthPromptModal from '../components/AuthPromptModal'
+import { getAuthStatus } from '../utils/auth'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -848,6 +850,7 @@ function TasteProfile() {
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
   const [filmCache, setFilmCache] = useState(() => {
     try {
       const stored = localStorage.getItem('filmism_film_cache')
@@ -864,6 +867,46 @@ function TasteProfile() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [selectedDecade, setSelectedDecade] = useState('all')
+
+  // Auto-restore pending guest onboarding selections upon login/register
+  useEffect(() => {
+    const pending = localStorage.getItem('filmism_pending_onboarding')
+    const { isAuthenticated } = getAuthStatus()
+    if (pending && isAuthenticated) {
+      try {
+        const parsed = JSON.parse(pending)
+        if (Array.isArray(parsed.genres) && parsed.genres.length > 0) setSelectedGenres(parsed.genres)
+        if (Array.isArray(parsed.origins) && parsed.origins.length > 0) setSelectedCinemas(parsed.origins)
+        if (Array.isArray(parsed.films) && parsed.films.length > 0) setSelectedFilms(parsed.films)
+        if (parsed.ratingsMap && Object.keys(parsed.ratingsMap).length > 0) setFavoriteRatings(parsed.ratingsMap)
+        if (parsed.filmCache && Object.keys(parsed.filmCache).length > 0) {
+          setFilmCache((prev) => ({ ...prev, ...parsed.filmCache }))
+        }
+        localStorage.removeItem('filmism_pending_onboarding')
+
+        if (Array.isArray(parsed.films) && parsed.films.length >= MIN_FILMS) {
+          setLoading(true)
+          setLoadingText('Synthesizing your saved taste curation with AI...')
+          initializeProfile({
+            genres: parsed.genres,
+            origins: parsed.origins,
+            films: parsed.films,
+            ratingsMap: parsed.ratingsMap || {},
+          })
+            .then(() => setStep(4))
+            .catch((err) => {
+              console.error('Failed to auto-initialize pending profile:', err)
+              setStep(3)
+            })
+            .finally(() => setLoading(false))
+        } else {
+          setStep(3)
+        }
+      } catch (e) {
+        localStorage.removeItem('filmism_pending_onboarding')
+      }
+    }
+  }, [])
 
   // Persist filmCache to localStorage
   useEffect(() => {
@@ -1178,6 +1221,25 @@ function TasteProfile() {
     } else if (step === 2) {
       setStep(3)
     } else if (step === 3) {
+      const { isAuthenticated } = getAuthStatus()
+      if (!isAuthenticated) {
+        // Persist selections so nothing is lost during account creation/login
+        try {
+          localStorage.setItem(
+            'filmism_pending_onboarding',
+            JSON.stringify({
+              genres: selectedGenres,
+              origins: selectedCinemas,
+              films: selectedFilms,
+              ratingsMap: favoriteRatings,
+              filmCache,
+            })
+          )
+        } catch (e) {}
+        setAuthModalOpen(true)
+        return
+      }
+
       setLoading(true)
       if (isContinueMode && typeof appendProfileFavorites === 'function') {
         setLoadingText('Incorporating new films into your taste clusters...')
@@ -1620,6 +1682,14 @@ function TasteProfile() {
           </NextBtn>
         </BtnRow>
       </BottomBar>
+
+      <AuthPromptModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        genresCount={selectedGenres.length}
+        originsCount={selectedCinemas.length}
+        filmsCount={selectedFilms.length}
+      />
     </>
   )
 }

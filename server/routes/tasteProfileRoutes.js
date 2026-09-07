@@ -1,23 +1,43 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const {
   initializeTasteProfile,
   appendTasteProfileFavorites,
   getUserTasteProfile,
   updateFavoriteRating,
 } = require('../controllers/tasteProfileController');
-const { optionalProtect } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
-// POST /api/taste-profile/initialize
-router.post('/initialize', optionalProtect, initializeTasteProfile);
+// Rate limiter for AI taste profile generation
+const tasteProfileLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // max 20 profile builds/updates per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many taste profile requests. Please wait a few minutes before trying again.',
+  },
+});
 
-// POST /api/taste-profile/append
-router.post('/append', optionalProtect, appendTasteProfileFavorites);
+const { validateRequest } = require('../middleware/validateRequest');
+const {
+  initializeTasteProfileSchema,
+  updateFavoriteRatingSchema,
+  appendFavoritesSchema,
+} = require('../validators/tasteProfileValidators');
 
-// GET /api/taste-profile/me
-router.get('/me', optionalProtect, getUserTasteProfile);
+// POST /api/taste-profile/initialize (Authenticated + Rate limited)
+router.post('/initialize', protect, tasteProfileLimiter, validateRequest(initializeTasteProfileSchema), initializeTasteProfile);
 
-// PUT /api/taste-profile/favorite-rating
-router.put('/favorite-rating', optionalProtect, updateFavoriteRating);
+// POST /api/taste-profile/append (Authenticated + Rate limited)
+router.post('/append', protect, tasteProfileLimiter, validateRequest(appendFavoritesSchema), appendTasteProfileFavorites);
+
+// GET /api/taste-profile/me (Authenticated)
+router.get('/me', protect, getUserTasteProfile);
+
+// PUT /api/taste-profile/favorite-rating (Authenticated)
+router.put('/favorite-rating', protect, validateRequest(updateFavoriteRatingSchema), updateFavoriteRating);
 
 module.exports = router;

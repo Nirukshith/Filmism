@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import styled from 'styled-components'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import loginPoster from '../assets/loginposter.png'
 import { authAPI } from '../services/api'
 import { useTasteProfile } from '../hooks/useTasteProfile'
@@ -360,6 +360,8 @@ const RegisterPrompt = styled.p`
 
 function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
 
   const [form, setForm] = useState({
     email: '',
@@ -406,7 +408,9 @@ function LoginPage() {
       const user = response.data
       const isComplete = !!(user.tasteProfileComplete)
 
-      if (isComplete) {
+      if (returnTo) {
+        navigate(returnTo)
+      } else if (isComplete) {
         navigate('/recommend')
       } else {
         navigate('/taste')
@@ -483,7 +487,7 @@ function LoginPage() {
           <Divider><span>or</span></Divider>
 
           <RegisterPrompt>
-            don't have an account? <Link to="/register">create one</Link>
+            don't have an account? <Link to={`/register${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}>create one</Link>
           </RegisterPrompt>
 
         </Form>
