@@ -70,10 +70,23 @@ export function TasteProvider({ children }) {
       const o = origins || selectedCinemas
       const f = films || selectedFilms
 
-      const favoritesPayload = f.map((id) => ({
-        tmdbId: Number(id),
-        rating: ratingsMap[id] !== undefined ? ratingsMap[id] : (favoriteRatings[id] || 3),
-      }))
+      const favoritesPayload = (f || [])
+        .map((item) => {
+          const rawId = typeof item === 'object' && item !== null ? (item.tmdbId || item.id) : item;
+          const cleanId = Number(rawId);
+          if (isNaN(cleanId) || cleanId <= 0) return null;
+          const rating =
+            ratingsMap[cleanId] !== undefined
+              ? ratingsMap[cleanId]
+              : (favoriteRatings[cleanId] !== undefined
+                  ? favoriteRatings[cleanId]
+                  : (typeof item === 'object' && item?.rating !== undefined ? item.rating : 3));
+          return {
+            tmdbId: cleanId,
+            rating: Number(rating) || 3,
+          };
+        })
+        .filter(Boolean);
 
       const response = await api.post('/taste-profile/initialize', {
         genres: g,
@@ -120,10 +133,23 @@ export function TasteProvider({ children }) {
   // Incrementally append new favorites and ratings to existing taste profile
   const appendProfileFavorites = async ({ films, ratingsMap = {} }) => {
     try {
-      const favoritesPayload = (films || []).map((id) => ({
-        tmdbId: Number(id),
-        rating: ratingsMap[id] !== undefined ? ratingsMap[id] : (favoriteRatings[id] || 3),
-      }))
+      const favoritesPayload = (films || [])
+        .map((item) => {
+          const rawId = typeof item === 'object' && item !== null ? (item.tmdbId || item.id) : item;
+          const cleanId = Number(rawId);
+          if (isNaN(cleanId) || cleanId <= 0) return null;
+          const rating =
+            ratingsMap[cleanId] !== undefined
+              ? ratingsMap[cleanId]
+              : (favoriteRatings[cleanId] !== undefined
+                  ? favoriteRatings[cleanId]
+                  : (typeof item === 'object' && item?.rating !== undefined ? item.rating : 3));
+          return {
+            tmdbId: cleanId,
+            rating: Number(rating) || 3,
+          };
+        })
+        .filter(Boolean);
 
       const response = await api.post('/taste-profile/append', {
         favorites: favoritesPayload,
@@ -142,6 +168,15 @@ export function TasteProvider({ children }) {
         if (newSessionId) {
           setSessionId(newSessionId)
           localStorage.setItem('filmism_session_id', newSessionId)
+        }
+
+        const storedUser = localStorage.getItem('user')
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser)
+            parsedUser.tasteProfileComplete = true
+            localStorage.setItem('user', JSON.stringify(parsedUser))
+          } catch (e) {}
         }
 
         localStorage.setItem('filmism_taste_clusters', JSON.stringify(clusters || []))

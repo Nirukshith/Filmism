@@ -10,7 +10,7 @@ const {
   getWatchlist,
   getDiary,
 } = require('../controllers/recommendationController');
-const { protect } = require('../middleware/authMiddleware');
+const { optionalProtect } = require('../middleware/authMiddleware');
 
 const { validateRequest } = require('../middleware/validateRequest');
 const {
@@ -20,28 +20,28 @@ const {
   recordOutcomeSchema,
 } = require('../validators/recommendationValidators');
 
-// POST /api/recommendations/candidates
-router.post('/candidates', protect, getCandidatePool);
+// POST /api/recommendations/candidates (Guest + Authenticated)
+router.post('/candidates', optionalProtect, getCandidatePool);
 
-// POST /api/recommendations/rate-candidate
-router.post('/rate-candidate', protect, validateRequest(rateCandidateSchema), rateCandidateFilm);
+// POST /api/recommendations/rate-candidate (Guest + Authenticated)
+router.post('/rate-candidate', optionalProtect, validateRequest(rateCandidateSchema), rateCandidateFilm);
 
-// GET /api/recommendations/ranked
-router.get('/ranked', protect, validateRequest(rankedRecommendationsQuerySchema, 'query'), getRankedRecommendations);
+// GET /api/recommendations/ranked (Guest + Authenticated)
+router.get('/ranked', optionalProtect, validateRequest(rankedRecommendationsQuerySchema, 'query'), getRankedRecommendations);
 
 // POST /api/recommendations/action (log shown, watchlisted, dismissed)
-router.post('/action', protect, validateRequest(recordActionSchema), recordAction);
+router.post('/action', optionalProtect, validateRequest(recordActionSchema), recordAction);
 
 // POST /api/recommendations/outcome (post-watch verdict rating)
-router.post('/outcome', protect, validateRequest(recordOutcomeSchema), recordOutcome);
+router.post('/outcome', optionalProtect, validateRequest(recordOutcomeSchema), recordOutcome);
 
 // GET /api/recommendations/telemetry-stats (hit-rate quality metrics)
-router.get('/telemetry-stats', protect, getTelemetryStats);
+router.get('/telemetry-stats', optionalProtect, getTelemetryStats);
 
-// GET /api/recommendations/watchlist
-router.get('/watchlist', protect, getWatchlist);
+// GET /api/recommendations/watchlist (Guest + Authenticated)
+router.get('/watchlist', optionalProtect, getWatchlist);
 
-// GET /api/recommendations/diary
-router.get('/diary', protect, getDiary);
+// GET /api/recommendations/diary (Guest + Authenticated)
+router.get('/diary', optionalProtect, getDiary);
 
 module.exports = router;

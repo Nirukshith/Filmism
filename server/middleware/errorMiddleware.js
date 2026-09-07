@@ -106,6 +106,8 @@ const errorHandler = (err, req, res, next) => {
   // Log non-operational (unexpected server bugs) or 500s with full stack trace for developer debugging
   if (!isOperational || statusCode >= 500) {
     console.error(`[SERVER ERROR] ${req.method} ${req.originalUrl}:`, err);
+  } else if (statusCode >= 400) {
+    console.warn(`[CLIENT ${statusCode} ERROR] ${req.method} ${req.originalUrl}: ${error.message}`, error.details || '');
   }
 
   // In production, do not leak unknown programmer error messages

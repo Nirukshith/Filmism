@@ -7,7 +7,7 @@ const {
   getUserTasteProfile,
   updateFavoriteRating,
 } = require('../controllers/tasteProfileController');
-const { protect } = require('../middleware/authMiddleware');
+const { optionalProtect } = require('../middleware/authMiddleware');
 
 // Rate limiter for AI taste profile generation
 const tasteProfileLimiter = rateLimit({
@@ -28,16 +28,16 @@ const {
   appendFavoritesSchema,
 } = require('../validators/tasteProfileValidators');
 
-// POST /api/taste-profile/initialize (Authenticated + Rate limited)
-router.post('/initialize', protect, tasteProfileLimiter, validateRequest(initializeTasteProfileSchema), initializeTasteProfile);
+// POST /api/taste-profile/initialize (Guest + Authenticated + Rate limited)
+router.post('/initialize', optionalProtect, tasteProfileLimiter, validateRequest(initializeTasteProfileSchema), initializeTasteProfile);
 
-// POST /api/taste-profile/append (Authenticated + Rate limited)
-router.post('/append', protect, tasteProfileLimiter, validateRequest(appendFavoritesSchema), appendTasteProfileFavorites);
+// POST /api/taste-profile/append (Guest + Authenticated + Rate limited)
+router.post('/append', optionalProtect, tasteProfileLimiter, validateRequest(appendFavoritesSchema), appendTasteProfileFavorites);
 
-// GET /api/taste-profile/me (Authenticated)
-router.get('/me', protect, getUserTasteProfile);
+// GET /api/taste-profile/me (Guest + Authenticated)
+router.get('/me', optionalProtect, getUserTasteProfile);
 
-// PUT /api/taste-profile/favorite-rating (Authenticated)
-router.put('/favorite-rating', protect, validateRequest(updateFavoriteRatingSchema), updateFavoriteRating);
+// PUT /api/taste-profile/favorite-rating (Guest + Authenticated)
+router.put('/favorite-rating', optionalProtect, validateRequest(updateFavoriteRatingSchema), updateFavoriteRating);
 
 module.exports = router;

@@ -867,6 +867,7 @@ function TasteProfile() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [selectedDecade, setSelectedDecade] = useState('all')
+  const [profileError, setProfileError] = useState('')
 
   // Auto-restore pending guest onboarding selections upon login/register
   useEffect(() => {
@@ -1241,6 +1242,7 @@ function TasteProfile() {
       }
 
       setLoading(true)
+      setProfileError('')
       if (isContinueMode && typeof appendProfileFavorites === 'function') {
         setLoadingText('Incorporating new films into your taste clusters...')
         try {
@@ -1251,7 +1253,7 @@ function TasteProfile() {
           setStep(4)
         } catch (err) {
           console.error('Failed to append taste profile:', err)
-          setStep(4)
+          setProfileError(err.response?.data?.message || 'Failed to update taste clusters. Please try again.')
         } finally {
           setLoading(false)
         }
@@ -1267,7 +1269,7 @@ function TasteProfile() {
           setStep(4)
         } catch (err) {
           console.error('Failed to build taste profile:', err)
-          setStep(4)
+          setProfileError(err.response?.data?.message || 'Failed to discover taste personas. Please check your selections and try again.')
         } finally {
           setLoading(false)
         }
@@ -1420,6 +1422,36 @@ function TasteProfile() {
                 Select films you love and rate how much they represent your taste.
                 We need at least {MIN_FILMS} to discover your taste clusters, with {TARGET_FILMS} recommended.
               </SectionSub>
+
+              {profileError && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1.5px solid #f87171',
+                  borderRadius: '10px',
+                  padding: '0.85rem 1.25rem',
+                  marginBottom: '1.25rem',
+                  fontFamily: 'Lexend Deca, sans-serif',
+                  fontSize: '0.85rem',
+                  color: '#991b1b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem'
+                }}>
+                  <span>⚠ {profileError}</span>
+                  <button
+                    onClick={() => setProfileError('')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#991b1b',
+                      cursor: 'pointer',
+                      fontSize: '1.1rem',
+                      lineHeight: '1'
+                    }}
+                  >×</button>
+                </div>
+              )}
 
               {/* Taste Signal Meter */}
               <SignalMeterWrap>
