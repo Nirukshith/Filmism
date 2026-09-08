@@ -43,6 +43,7 @@ app.use('/api/movies', movieRoutes)
 app.use('/api/taste-profile', require('./routes/tasteProfileRoutes'))
 app.use('/api/recommendations', require('./routes/recommendationRoutes'))
 app.use('/api/matching', require('./routes/matchRoutes'))
+app.use('/api/conversations', require('./routes/conversationRoutes'))
 
 // 404 handler for undefined routes
 app.use(notFoundHandler)

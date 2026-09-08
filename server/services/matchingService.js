@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const UserTasteProfile = require('../models/userTasteProfileModel');
 const User = require('../models/userModel');
 const Match = require('../models/matchModel');
+const Block = require('../models/blockModel');
 const vectorService = require('./vectorService');
 
 const DEFAULT_RECENT_MATCH_DAYS = 7;
@@ -138,16 +139,26 @@ async function findCinephileTwin(userId, options = {}) {
     throw err;
   }
 
-  // 2. Identify recently matched users to avoid immediate duplicates
+  // 2. Identify recently matched users and blocked users to avoid duplicates/unwanted contact
   const cutoffDate = new Date(Date.now() - recentDays * 24 * 60 * 60 * 1000);
-  const recentMatches = await Match.find({
-    $or: [{ userA: requestingUserId }, { userB: requestingUserId }],
-    createdAt: { $gte: cutoffDate },
-  }).lean();
+  const [recentMatches, blocks] = await Promise.all([
+    Match.find({
+      $or: [{ userA: requestingUserId }, { userB: requestingUserId }],
+      createdAt: { $gte: cutoffDate },
+    }).lean(),
+    Block.find({
+      $or: [{ blocker: requestingUserId }, { blocked: requestingUserId }],
+    }).lean(),
+  ]);
 
   const excludedUserIds = recentMatches.map((m) =>
     m.userA.toString() === requestingUserId.toString() ? m.userB : m.userA
   );
+  blocks.forEach((b) => {
+    const blockedPartner =
+      b.blocker.toString() === requestingUserId.toString() ? b.blocked : b.blocker;
+    excludedUserIds.push(blockedPartner);
+  });
   excludedUserIds.push(requestingUserId);
 
   let candidate = null;
@@ -250,8 +261,17 @@ async function findCinephileTwin(userId, options = {}) {
 async function getCurrentMatch(userId) {
   const requestingUserId = new mongoose.Types.ObjectId(userId);
 
+  const blocks = await Block.find({
+    $or: [{ blocker: requestingUserId }, { blocked: requestingUserId }],
+  }).lean();
+  const blockedUserIds = blocks.map((b) =>
+    b.blocker.toString() === requestingUserId.toString() ? b.blocked : b.blocker
+  );
+
   const match = await Match.findOne({
     $or: [{ userA: requestingUserId }, { userB: requestingUserId }],
+    userA: { $nin: blockedUserIds },
+    userB: { $nin: blockedUserIds },
   })
     .sort({ createdAt: -1 })
     .lean();

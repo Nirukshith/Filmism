@@ -1,4 +1,5 @@
 const matchingService = require('../services/matchingService');
+const connectionService = require('../services/connectionService');
 const UserTasteProfile = require('../models/userTasteProfileModel');
 
 /**
@@ -94,8 +95,95 @@ const findMatch = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/matching/request-connect
+ * Send a connect request to a Cinephile Twin.
+ */
+const requestConnect = async (req, res, next) => {
+  try {
+    const fromUserId = req.user._id;
+    const { toUserId, matchId, message } = req.body;
+
+    const result = await connectionService.sendConnectRequest({
+      fromUserId,
+      toUserId,
+      matchId,
+      message,
+    });
+
+    res.status(result.status === 'accepted' ? 200 : 201).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/matching/requests
+ * Get incoming and outgoing pending connect requests for the current user.
+ */
+const getRequests = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const result = await connectionService.getPendingRequests(userId);
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/matching/requests/:id/respond
+ * Respond to an incoming connect request (accept or decline).
+ */
+const respondToRequest = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { id: requestId } = req.params;
+    const { action } = req.body;
+
+    const result = await connectionService.respondToRequest({
+      userId,
+      requestId,
+      action,
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/matching/requests/:id/cancel
+ * Cancel an outgoing pending connect request.
+ */
+const cancelRequest = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { id: requestId } = req.params;
+
+    const result = await connectionService.cancelRequest({
+      userId,
+      requestId,
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   toggleOptIn,
   getCurrentMatch,
   findMatch,
+  requestConnect,
+  getRequests,
+  respondToRequest,
+  cancelRequest,
 };
+

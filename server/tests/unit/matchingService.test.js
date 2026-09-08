@@ -8,13 +8,21 @@ const {
 const UserTasteProfile = require('../../models/userTasteProfileModel');
 const User = require('../../models/userModel');
 const Match = require('../../models/matchModel');
+const Block = require('../../models/blockModel');
 const vectorService = require('../../services/vectorService');
 
 jest.mock('../../models/userTasteProfileModel');
 jest.mock('../../models/userModel');
 jest.mock('../../models/matchModel');
+jest.mock('../../models/blockModel');
 
 describe('Matching Service Unit Tests (Phase 3)', () => {
+  beforeEach(() => {
+    Block.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([]),
+    });
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });
