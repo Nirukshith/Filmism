@@ -3,6 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { useNavigate, Link } from 'react-router-dom'
 import { getAuthStatus } from '../utils/auth'
 import { authAPI } from '../services/api'
+import NotificationBell from './NotificationBell'
 
 // ─── Minimalist SVG Dropdown Icons ───────────────────────────────────────────
 
@@ -60,9 +61,21 @@ const ChatIcon = ({ size = 14 }) => (
   </svg>
 )
 
+const ShieldIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+)
+
 const fadeSlide = keyframes`
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
+`
+
+const NavContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 `
 
 const Wrapper = styled.div`
@@ -248,60 +261,78 @@ function UserAvatar() {
   }
 
   return (
-    <Wrapper ref={ref}>
-      <AvatarBtn
-        id="user-avatar-btn"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="User menu"
-        aria-expanded={open}
-      >
-        {profilePicture ? (
-          <AvatarImg src={profilePicture} alt={fullName} />
-        ) : (
-          initials
-        )}
-      </AvatarBtn>
+    <NavContainer>
+      <NotificationBell />
+      <Wrapper ref={ref}>
+        <AvatarBtn
+          id="user-avatar-btn"
+          onClick={() => setOpen((v) => !v)}
+          aria-label="User menu"
+          aria-expanded={open}
+        >
+          {profilePicture ? (
+            <AvatarImg src={profilePicture} alt={fullName} />
+          ) : (
+            initials
+          )}
+        </AvatarBtn>
 
-      {open && (
-        <Dropdown role="menu" aria-label="User menu">
-          <DropHeader>
-            <DropName>{fullName}</DropName>
-            {email && <DropEmail>{email}</DropEmail>}
-          </DropHeader>
-          <DropMenu>
-            <DropItem to="/recommend" onClick={() => setOpen(false)} role="menuitem">
-              <span className="icon"><DashboardIcon size={14} /></span>
-              dashboard
-            </DropItem>
-            <DropItem to="/watchlist" onClick={() => setOpen(false)} role="menuitem">
-              <span className="icon"><WatchlistIcon size={14} /></span>
-              watchlist
-            </DropItem>
-            <DropItem to="/diary" onClick={() => setOpen(false)} role="menuitem">
-              <span className="icon"><DiaryIcon size={14} /></span>
-              film logs
-            </DropItem>
-            <DropItem to="/twin" onClick={() => setOpen(false)} role="menuitem">
-              <span className="icon"><TwinIcon size={14} /></span>
-              cinephile twin
-            </DropItem>
-            <DropItem to="/messages" onClick={() => setOpen(false)} role="menuitem">
-              <span className="icon"><ChatIcon size={14} /></span>
-              messages
-            </DropItem>
-            <DropItem to="/settings" onClick={() => setOpen(false)} role="menuitem">
-              <span className="icon"><SettingsIcon size={14} /></span>
-              settings
-            </DropItem>
-          </DropMenu>
-          <DropDivider />
-          <SignOutBtn onClick={handleSignOut} role="menuitem">
-            <span className="icon"><LogoutIcon size={14} /></span>
-            sign out
-          </SignOutBtn>
-        </Dropdown>
-      )}
-    </Wrapper>
+        {open && (
+          <Dropdown role="menu" aria-label="User menu">
+            <DropHeader>
+              <DropName>{fullName}</DropName>
+              {email && <DropEmail>{email}</DropEmail>}
+            </DropHeader>
+            <DropMenu>
+              {currentUser?.role === 'admin' ? (
+                <>
+                  <DropItem to="/admin" onClick={() => setOpen(false)} role="menuitem" style={{ color: '#ff751f', fontWeight: 600 }}>
+                    <span className="icon" style={{ color: '#ff751f' }}><ShieldIcon size={14} /></span>
+                    admin panel
+                  </DropItem>
+                  <DropItem to="/settings" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><SettingsIcon size={14} /></span>
+                    settings
+                  </DropItem>
+                </>
+              ) : (
+                <>
+                  <DropItem to="/recommend" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><DashboardIcon size={14} /></span>
+                    dashboard
+                  </DropItem>
+                  <DropItem to="/watchlist" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><WatchlistIcon size={14} /></span>
+                    watchlist
+                  </DropItem>
+                  <DropItem to="/diary" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><DiaryIcon size={14} /></span>
+                    film logs
+                  </DropItem>
+                  <DropItem to="/twin" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><TwinIcon size={14} /></span>
+                    cinephile twin
+                  </DropItem>
+                  <DropItem to="/messages" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><ChatIcon size={14} /></span>
+                    messages
+                  </DropItem>
+                  <DropItem to="/settings" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><SettingsIcon size={14} /></span>
+                    settings
+                  </DropItem>
+                </>
+              )}
+            </DropMenu>
+            <DropDivider />
+            <SignOutBtn onClick={handleSignOut} role="menuitem">
+              <span className="icon"><LogoutIcon size={14} /></span>
+              sign out
+            </SignOutBtn>
+          </Dropdown>
+        )}
+      </Wrapper>
+    </NavContainer>
   )
 }
 

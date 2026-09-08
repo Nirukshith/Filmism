@@ -47,6 +47,7 @@ export const matchingAPI = {
   getRequests: () => api.get('/matching/requests'),
   respondRequest: (id, action) => api.post(`/matching/requests/${id}/respond`, { action }),
   cancelRequest: (id) => api.post(`/matching/requests/${id}/cancel`),
+  getNextRecommendation: (data) => api.post('/matching/next-recommendation', data),
 }
 
 // Conversations & Messaging endpoints
@@ -61,7 +62,7 @@ export const conversationAPI = {
     api.post(`/conversations/${conversationId}/archive`, { archive }),
 }
 
-// Safety endpoints (Block & Report)
+// Safety & Moderation endpoints (Block, Report, Admin triage & Ban)
 export const safetyAPI = {
   blockUser: (userId, reason) => api.post(`/users/${userId}/block`, { reason }),
   unblockUser: (userId) => api.post(`/users/${userId}/unblock`),
@@ -69,6 +70,18 @@ export const safetyAPI = {
   reportUser: (userId, data) => api.post(`/users/${userId}/report`, data),
   getReports: (params = {}) => api.get('/safety/reports', { params }),
   updateReport: (id, data) => api.patch(`/safety/reports/${id}`, data),
+  getAdminStats: () => api.get('/safety/stats'),
+  banUser: (userId, data = {}) => api.post(`/safety/users/${userId}/ban`, data),
+  unbanUser: (userId) => api.post(`/safety/users/${userId}/unban`),
+  getBannedUsers: () => api.get('/safety/users/banned'),
+}
+
+// Notification endpoints
+export const notificationAPI = {
+  getNotifications: (params = {}) => api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
 }
 
 export default api

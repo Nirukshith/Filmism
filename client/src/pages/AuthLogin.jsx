@@ -425,7 +425,9 @@ function LoginPage() {
       const user = response.data
       const isComplete = !!(user.tasteProfileComplete)
 
-      if (returnTo) {
+      if (user?.role === 'admin') {
+        navigate(returnTo || '/admin')
+      } else if (returnTo) {
         navigate(returnTo)
       } else if (isComplete) {
         navigate('/recommend')

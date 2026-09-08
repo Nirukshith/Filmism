@@ -4,12 +4,14 @@ const MatchRequest = require('../../models/matchRequestModel');
 const Conversation = require('../../models/conversationModel');
 const Block = require('../../models/blockModel');
 const User = require('../../models/userModel');
+const notificationService = require('../../services/notificationService');
 
-// Mock Mongoose models
+// Mock Mongoose models and services
 jest.mock('../../models/matchRequestModel');
 jest.mock('../../models/conversationModel');
 jest.mock('../../models/blockModel');
 jest.mock('../../models/userModel');
+jest.mock('../../services/notificationService');
 
 describe('Cinephile Pairing V2 - Phase 2 Connection Service Tests', () => {
   const userAId = new mongoose.Types.ObjectId('507f191e810c19729de860ea');
@@ -20,6 +22,12 @@ describe('Cinephile Pairing V2 - Phase 2 Connection Service Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    User.findById.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: userBId, firstName: 'Bob' }),
+      }),
+    });
+    notificationService.createNotification.mockResolvedValue({});
   });
 
   describe('sendConnectRequest', () => {

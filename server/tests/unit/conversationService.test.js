@@ -3,10 +3,14 @@ const conversationService = require('../../services/conversationService');
 const Conversation = require('../../models/conversationModel');
 const Message = require('../../models/messageModel');
 const Block = require('../../models/blockModel');
+const User = require('../../models/userModel');
+const notificationService = require('../../services/notificationService');
 
 jest.mock('../../models/conversationModel');
 jest.mock('../../models/messageModel');
 jest.mock('../../models/blockModel');
+jest.mock('../../models/userModel');
+jest.mock('../../services/notificationService');
 
 describe('Cinephile Pairing V2 - Phase 3 Conversation & Messaging Service Tests', () => {
   const userAId = new mongoose.Types.ObjectId('507f191e810c19729de860ea');
@@ -16,6 +20,13 @@ describe('Cinephile Pairing V2 - Phase 3 Conversation & Messaging Service Tests'
 
   beforeEach(() => {
     jest.clearAllMocks();
+    User.findById.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: userAId, firstName: 'Alice' }),
+      }),
+    });
+    notificationService.createNotification.mockResolvedValue({});
+    notificationService.markConversationNotificationsAsRead.mockResolvedValue({});
   });
 
   describe('getUserConversations', () => {
@@ -60,7 +71,52 @@ describe('Cinephile Pairing V2 - Phase 3 Conversation & Messaging Service Tests'
       expect(result[0].partner.firstName).toBe('Bob');
       expect(result[0].partner.userId).toEqual(userBId);
       expect(result[0].hasUnread).toBe(true);
+      expect(result[0].isBlocked).toBe(false);
+      expect(result[0].canMessage).toBe(true);
       expect(result[0].lastMessage.text).toBe('Seen any good films?');
+    });
+
+    it('should still return conversation in list when user has blocked the partner', async () => {
+      Block.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { blocker: userAId, blocked: userBId },
+        ]),
+      });
+
+      const mockConversations = [
+        {
+          _id: convId,
+          participants: [
+            { _id: userAId, firstName: 'Alice' },
+            { _id: userBId, firstName: 'Bob', profilePicture: '/avatar.jpg' },
+          ],
+          lastMessage: {
+            text: 'Hello',
+            sender: userBId,
+            sentAt: new Date(),
+          },
+          lastMessageAt: new Date(),
+          readState: [],
+          isActive: false,
+          createdAt: new Date(),
+        },
+      ];
+
+      Conversation.find.mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          sort: jest.fn().mockReturnValue({
+            lean: jest.fn().mockResolvedValue(mockConversations),
+          }),
+        }),
+      });
+
+      const result = await conversationService.getUserConversations(userAId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].partner.userId).toEqual(userBId);
+      expect(result[0].isBlocked).toBe(true);
+      expect(result[0].isBlockedByMe).toBe(true);
+      expect(result[0].canMessage).toBe(false);
     });
   });
 
@@ -98,7 +154,7 @@ describe('Cinephile Pairing V2 - Phase 3 Conversation & Messaging Service Tests'
       });
     });
 
-    it('should return empty messages and isBlocked: true if participants blocked each other', async () => {
+    it('should return isBlocked: true and canMessage: false when blocked', async () => {
       Conversation.findById.mockReturnValue({
         populate: jest.fn().mockReturnValue({
           lean: jest.fn().mockResolvedValue({
@@ -115,11 +171,19 @@ describe('Cinephile Pairing V2 - Phase 3 Conversation & Messaging Service Tests'
         lean: jest.fn().mockResolvedValue({ blocker: userBId, blocked: userAId }),
       });
 
+      Message.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({
+            lean: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
       const result = await conversationService.getConversationMessages(userAId, convId);
 
       expect(result.isBlocked).toBe(true);
-      expect(result.messages).toEqual([]);
-      expect(Message.find).not.toHaveBeenCalled();
+      expect(result.isBlockedByPartner).toBe(true);
+      expect(result.canMessage).toBe(false);
     });
 
     it('should support cursor-based polling with since or after params', async () => {
@@ -183,6 +247,24 @@ describe('Cinephile Pairing V2 - Phase 3 Conversation & Messaging Service Tests'
       });
     });
 
+    it('should THROW 403 with unblock instruction if sender has blocked recipient', async () => {
+      Conversation.findById.mockResolvedValue({
+        _id: convId,
+        participants: [userAId, userBId],
+      });
+
+      Block.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ blocker: userAId, blocked: userBId }),
+      });
+
+      await expect(
+        conversationService.sendMessage(userAId, convId, 'Trying to message blocked user')
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        message: 'You have blocked this user. Please unblock them to send a message.',
+      });
+    });
+
     it('should THROW 403 if sender is blocked by recipient', async () => {
       Conversation.findById.mockResolvedValue({
         _id: convId,
@@ -194,7 +276,7 @@ describe('Cinephile Pairing V2 - Phase 3 Conversation & Messaging Service Tests'
       });
 
       await expect(
-        conversationService.sendMessage(userAId, convId, 'Hello?')
+        conversationService.sendMessage(userAId, convId, 'Blocked attempt')
       ).rejects.toMatchObject({
         statusCode: 403,
         message: 'Cannot send message to this conversation.',

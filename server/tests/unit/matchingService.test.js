@@ -4,6 +4,7 @@ const {
   formatMatchResponse,
   findCinephileTwin,
   getCurrentMatch,
+  getNextTwinRecommendation,
 } = require('../../services/matchingService');
 const UserTasteProfile = require('../../models/userTasteProfileModel');
 const User = require('../../models/userModel');
@@ -298,6 +299,61 @@ describe('Matching Service Unit Tests (Phase 3)', () => {
       expect(formatted.twin.email).toBeUndefined();
       expect(formatted.twin.sessionId).toBeUndefined();
       expect(formatted.twin.password).toBeUndefined();
+    });
+  });
+
+  describe('getNextTwinRecommendation', () => {
+    it('should return next highest-rated favorite film from twin that user has not seen or excluded', async () => {
+      const userAId = new mongoose.Types.ObjectId();
+      const userBId = new mongoose.Types.ObjectId();
+
+      UserTasteProfile.findOne
+        .mockReturnValueOnce({
+          lean: jest.fn().mockResolvedValue({
+            userId: userAId,
+            favorites: [{ tmdbId: 100, title: 'Inception' }],
+          }),
+        })
+        .mockReturnValueOnce({
+          lean: jest.fn().mockResolvedValue({
+            userId: userBId,
+            favorites: [
+              { tmdbId: 100, title: 'Inception', rating: 4 }, // Already in User A favs
+              { tmdbId: 200, title: 'Spider-Man', rating: 4 }, // Already watched/excluded
+              { tmdbId: 300, title: 'Chinatown', rating: 4 }, // Next pick!
+              { tmdbId: 400, title: 'Blade Runner', rating: 3 },
+            ],
+          }),
+        });
+
+      const nextFilm = await getNextTwinRecommendation(userAId, userBId, [200]);
+
+      expect(nextFilm).toBeDefined();
+      expect(nextFilm.tmdbId).toBe(300);
+      expect(nextFilm.title).toBe('Chinatown');
+    });
+
+    it('should return null when all candidate recommendations from twin are exhausted', async () => {
+      const userAId = new mongoose.Types.ObjectId();
+      const userBId = new mongoose.Types.ObjectId();
+
+      UserTasteProfile.findOne
+        .mockReturnValueOnce({
+          lean: jest.fn().mockResolvedValue({
+            userId: userAId,
+            favorites: [{ tmdbId: 100, title: 'Inception' }],
+          }),
+        })
+        .mockReturnValueOnce({
+          lean: jest.fn().mockResolvedValue({
+            userId: userBId,
+            favorites: [{ tmdbId: 100, title: 'Inception', rating: 4 }],
+          }),
+        });
+
+      const nextFilm = await getNextTwinRecommendation(userAId, userBId, []);
+
+      expect(nextFilm).toBeNull();
     });
   });
 });

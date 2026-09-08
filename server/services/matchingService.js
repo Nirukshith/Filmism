@@ -316,9 +316,76 @@ function formatMatchResponse(matchDoc, requestingUserId, partnerUser) {
   };
 }
 
+/**
+ * Retrieve the next recommended film from a Cinephile Twin, excluding films already seen or watched.
+ *
+ * @param {string|ObjectId} userId - Current requesting user ID
+ * @param {string|ObjectId} twinUserId - Matched twin user ID
+ * @param {number[]} [excludedTmdbIds=[]] - Array of tmdbIds to exclude
+ * @returns {Promise<Object|null>} Next recommended film or null if exhausted
+ */
+async function getNextTwinRecommendation(userId, twinUserId, excludedTmdbIds = []) {
+  const requestingUserId = new mongoose.Types.ObjectId(userId);
+  const twinUserObjId = new mongoose.Types.ObjectId(twinUserId);
+
+  const [userProfile, twinProfile] = await Promise.all([
+    UserTasteProfile.findOne({ userId: requestingUserId }).lean(),
+    UserTasteProfile.findOne({ userId: twinUserObjId }).lean(),
+  ]);
+
+  if (!twinProfile) {
+    const err = new Error('Twin taste profile not found.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const userFavSet = new Set((userProfile?.favorites || []).map((f) => Number(f.tmdbId)));
+  const excludeSet = new Set((excludedTmdbIds || []).map(Number));
+
+  // Find candidate films from twin's favorites
+  const candidateFilms = (twinProfile.favorites || []).filter(
+    (favB) =>
+      !userFavSet.has(Number(favB.tmdbId)) &&
+      !excludeSet.has(Number(favB.tmdbId)) &&
+      (favB.rating === undefined || favB.rating >= 3)
+  );
+
+  if (candidateFilms.length === 0) {
+    // Check remaining favorites as fallback
+    const fallbackFilms = (twinProfile.favorites || []).filter(
+      (favB) =>
+        !userFavSet.has(Number(favB.tmdbId)) &&
+        !excludeSet.has(Number(favB.tmdbId))
+    );
+
+    if (fallbackFilms.length === 0) {
+      return null;
+    }
+
+    const pick = fallbackFilms[0];
+    return {
+      tmdbId: Number(pick.tmdbId),
+      title: pick.title,
+      posterPath: pick.posterPath || null,
+      year: pick.year || null,
+      recommendedBy: twinProfile.userId,
+    };
+  }
+
+  const topPick = candidateFilms.sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
+  return {
+    tmdbId: Number(topPick.tmdbId),
+    title: topPick.title,
+    posterPath: topPick.posterPath || null,
+    year: topPick.year || null,
+    recommendedBy: twinProfile.userId,
+  };
+}
+
 module.exports = {
   findCinephileTwin,
   getCurrentMatch,
   computeExplainability,
   formatMatchResponse,
+  getNextTwinRecommendation,
 };

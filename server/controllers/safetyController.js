@@ -117,6 +117,71 @@ const updateReport = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/safety/users/:id/ban
+ * Ban a user with optional reason and report association.
+ */
+const banUser = async (req, res, next) => {
+  try {
+    const adminId = req.user._id;
+    const { id: userId } = req.params;
+    const { reason, reportId } = req.body || {};
+
+    const result = await safetyService.banUser(adminId, userId, reason, reportId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/safety/users/:id/unban
+ * Unban a previously banned user.
+ */
+const unbanUser = async (req, res, next) => {
+  try {
+    const adminId = req.user._id;
+    const { id: userId } = req.params;
+
+    const result = await safetyService.unbanUser(adminId, userId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/safety/users/banned
+ * List all currently banned users.
+ */
+const getBannedUsers = async (req, res, next) => {
+  try {
+    const bannedUsers = await safetyService.getBannedUsers();
+    res.json({
+      success: true,
+      bannedUsers,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/safety/stats
+ * Moderation Dashboard overview metrics.
+ */
+const getAdminStats = async (req, res, next) => {
+  try {
+    const stats = await safetyService.getAdminStats();
+    res.json({
+      success: true,
+      stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   blockUser,
   unblockUser,
@@ -124,4 +189,8 @@ module.exports = {
   reportUser,
   getReports,
   updateReport,
+  banUser,
+  unbanUser,
+  getBannedUsers,
+  getAdminStats,
 };

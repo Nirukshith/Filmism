@@ -9,6 +9,7 @@ const {
   getRequests,
   respondToRequest,
   cancelRequest,
+  getNextTwinRecommendation,
 } = require('../controllers/matchController');
 const { protect } = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validateRequest');
@@ -16,6 +17,7 @@ const {
   optInSchema,
   requestConnectSchema,
   respondRequestSchema,
+  nextTwinRecommendationSchema,
 } = require('../validators/matchingValidators');
 
 // Rate limiter for finding matches to prevent brute-force probing and vector computation spam
@@ -79,5 +81,13 @@ router.post(
 
 // POST /api/matching/requests/:id/cancel (Auth required)
 router.post('/requests/:id/cancel', protect, cancelRequest);
+
+// POST /api/matching/next-recommendation (Auth required + Validated)
+router.post(
+  '/next-recommendation',
+  protect,
+  validateRequest(nextTwinRecommendationSchema),
+  getNextTwinRecommendation
+);
 
 module.exports = router;

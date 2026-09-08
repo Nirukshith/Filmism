@@ -3,6 +3,7 @@ const MatchRequest = require('../models/matchRequestModel');
 const Conversation = require('../models/conversationModel');
 const Block = require('../models/blockModel');
 const User = require('../models/userModel');
+const notificationService = require('./notificationService');
 
 /**
  * Send a connect request to a matched user.
@@ -78,6 +79,24 @@ async function sendConnectRequest({ fromUserId, toUserId, matchId, message }) {
       { upsert: true, new: true }
     );
 
+    // Notify reciprocal sender that connection is now mutual
+    try {
+      const senderUser = await User.findById(fromUserObjId).select('firstName').lean();
+      await notificationService.createNotification({
+        recipient: toUserObjId,
+        sender: fromUserObjId,
+        type: 'connection_accepted',
+        title: 'Connection Request Accepted!',
+        body: `${senderUser?.firstName || 'Your Cinephile Twin'} connected with you. You can now chat!`,
+        data: {
+          conversationId: conversation._id,
+          requestId: reciprocalRequest._id,
+        },
+      });
+    } catch (notifErr) {
+      console.error('Failed to create connection accepted notification:', notifErr.message);
+    }
+
     return {
       success: true,
       status: 'accepted',
@@ -122,6 +141,22 @@ async function sendConnectRequest({ fromUserId, toUserId, matchId, message }) {
     existingRequest.respondedAt = null;
     await existingRequest.save();
 
+    try {
+      const senderUser = await User.findById(fromUserObjId).select('firstName').lean();
+      await notificationService.createNotification({
+        recipient: toUserObjId,
+        sender: fromUserObjId,
+        type: 'connection_request',
+        title: 'New Cinephile Connection Request',
+        body: `${senderUser?.firstName || 'A cinephile'} sent you a connection request.`,
+        data: {
+          requestId: existingRequest._id,
+        },
+      });
+    } catch (notifErr) {
+      console.error('Failed to create connection request notification:', notifErr.message);
+    }
+
     return {
       success: true,
       status: 'pending',
@@ -138,6 +173,22 @@ async function sendConnectRequest({ fromUserId, toUserId, matchId, message }) {
     message: message || null,
     status: 'pending',
   });
+
+  try {
+    const senderUser = await User.findById(fromUserObjId).select('firstName').lean();
+    await notificationService.createNotification({
+      recipient: toUserObjId,
+      sender: fromUserObjId,
+      type: 'connection_request',
+      title: 'New Cinephile Connection Request',
+      body: `${senderUser?.firstName || 'A cinephile'} sent you a connection request.`,
+      data: {
+        requestId: newRequest._id,
+      },
+    });
+  } catch (notifErr) {
+    console.error('Failed to create connection request notification:', notifErr.message);
+  }
 
   return {
     success: true,
@@ -279,6 +330,24 @@ async function respondToRequest({ userId, requestId, action }) {
       },
       { upsert: true, new: true }
     );
+
+    // Notify requester that connection was accepted
+    try {
+      const acceptingUser = await User.findById(userObjId).select('firstName').lean();
+      await notificationService.createNotification({
+        recipient: request.fromUser,
+        sender: userObjId,
+        type: 'connection_accepted',
+        title: 'Connection Request Accepted!',
+        body: `${acceptingUser?.firstName || 'Your Cinephile Twin'} accepted your connection request. You can now chat!`,
+        data: {
+          conversationId: conversation._id,
+          requestId: request._id,
+        },
+      });
+    } catch (notifErr) {
+      console.error('Failed to create connection accepted notification:', notifErr.message);
+    }
 
     return {
       success: true,

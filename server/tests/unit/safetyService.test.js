@@ -6,6 +6,7 @@ const Conversation = require('../../models/conversationModel');
 const MatchRequest = require('../../models/matchRequestModel');
 const Message = require('../../models/messageModel');
 const User = require('../../models/userModel');
+const UserTasteProfile = require('../../models/userTasteProfileModel');
 
 jest.mock('../../models/blockModel');
 jest.mock('../../models/reportModel');
@@ -13,6 +14,12 @@ jest.mock('../../models/conversationModel');
 jest.mock('../../models/matchRequestModel');
 jest.mock('../../models/messageModel');
 jest.mock('../../models/userModel');
+jest.mock('../../models/userTasteProfileModel');
+jest.mock('../../utils/sendEmail', () => ({
+  sendOtpEmail: jest.fn().mockResolvedValue(true),
+  sendBanNotificationEmail: jest.fn().mockResolvedValue(true),
+  sendWarningNotificationEmail: jest.fn().mockResolvedValue(true),
+}));
 
 describe('Cinephile Pairing V2 - Phase 4 Safety Service Tests', () => {
   const userAId = new mongoose.Types.ObjectId('507f191e810c19729de860ea');
@@ -213,7 +220,11 @@ describe('Cinephile Pairing V2 - Phase 4 Safety Service Tests', () => {
       };
 
       Report.findByIdAndUpdate.mockReturnValue({
-        lean: jest.fn().mockResolvedValue(updatedReport),
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            lean: jest.fn().mockResolvedValue(updatedReport),
+          }),
+        }),
       });
 
       const result = await safetyService.updateReportStatus(reportId, {
@@ -226,4 +237,97 @@ describe('Cinephile Pairing V2 - Phase 4 Safety Service Tests', () => {
       expect(result.report.status).toBe('actioned');
     });
   });
+
+  describe('Admin Moderation Actions: banUser, unbanUser, getAdminStats', () => {
+    it('banUser should set isBanned=true, disable matching, deactivate conversations, cancel match requests, and resolve report', async () => {
+      const mockUserDoc = {
+        _id: userBId,
+        firstName: 'Bad',
+        lastName: 'Actor',
+        email: 'bad@actor.com',
+        isBanned: false,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      User.findById.mockResolvedValue(mockUserDoc);
+      UserTasteProfile.updateOne.mockResolvedValue({ modifiedCount: 1 });
+      Conversation.updateMany.mockResolvedValue({ modifiedCount: 1 });
+      MatchRequest.updateMany.mockResolvedValue({ modifiedCount: 1 });
+
+      const mockResolvedReport = {
+        _id: reportId,
+        status: 'resolved',
+        actionTaken: 'user_banned',
+      };
+      Report.findByIdAndUpdate.mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            lean: jest.fn().mockResolvedValue(mockResolvedReport),
+          }),
+        }),
+      });
+
+      const result = await safetyService.banUser(userAId, userBId, 'Toxic behavior', reportId);
+
+      expect(mockUserDoc.isBanned).toBe(true);
+      expect(mockUserDoc.save).toHaveBeenCalled();
+      expect(UserTasteProfile.updateOne).toHaveBeenCalledWith(
+        { userId: userBId },
+        { $set: { matchingEnabled: false } }
+      );
+      expect(Conversation.updateMany).toHaveBeenCalledWith(
+        { participants: userBId },
+        { $set: { isActive: false } }
+      );
+      expect(MatchRequest.updateMany).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ $set: expect.objectContaining({ status: 'cancelled' }) })
+      );
+      expect(result.success).toBe(true);
+      expect(result.user.isBanned).toBe(true);
+    });
+
+    it('unbanUser should set isBanned=false', async () => {
+      const mockUserDoc = {
+        _id: userBId,
+        firstName: 'Good',
+        lastName: 'Actor',
+        isBanned: true,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      User.findById.mockResolvedValue(mockUserDoc);
+
+      const result = await safetyService.unbanUser(userAId, userBId);
+
+      expect(mockUserDoc.isBanned).toBe(false);
+      expect(mockUserDoc.save).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(result.user.isBanned).toBe(false);
+    });
+
+    it('getAdminStats should aggregate report and user counts', async () => {
+      Report.countDocuments
+        .mockResolvedValueOnce(10) // total
+        .mockResolvedValueOnce(3)  // open
+        .mockResolvedValueOnce(2)  // in_review
+        .mockResolvedValueOnce(4)  // resolved
+        .mockResolvedValueOnce(1); // dismissed
+
+      User.countDocuments
+        .mockResolvedValueOnce(2)  // isBanned: true
+        .mockResolvedValueOnce(50); // totalUsers
+
+      const stats = await safetyService.getAdminStats();
+
+      expect(stats.totalReports).toBe(10);
+      expect(stats.openReports).toBe(3);
+      expect(stats.inReviewReports).toBe(2);
+      expect(stats.resolvedReports).toBe(4);
+      expect(stats.dismissedReports).toBe(1);
+      expect(stats.bannedUsersCount).toBe(2);
+      expect(stats.totalUsersCount).toBe(50);
+    });
+  });
 });
+

@@ -124,6 +124,13 @@ const verifyOtp = async (req, res, next) => {
 
     const normalizedEmail = email.toLowerCase().trim()
     const user = await User.findOne({ email: normalizedEmail })
+    if (user && user.isBanned) {
+      return res.status(403).json({
+        message: 'Your account has been suspended by a platform administrator.',
+        isBanned: true,
+        bannedReason: user.bannedReason || 'Terms of Service violation',
+      })
+    }
     if (!user || user.isVerified || !user.otp || !user.otpExpiry || user.otpExpiry < Date.now()) {
       return res.status(400).json({ message: 'Invalid or expired OTP. Please request a new one.' })
     }
@@ -236,6 +243,14 @@ const loginUser = async (req, res, next) => {
       return res.status(401).json({ message: 'Please verify your email before logging in' })
     }
 
+    if (user.isBanned) {
+      return res.status(403).json({
+        message: 'Your account has been suspended by a platform administrator.',
+        isBanned: true,
+        bannedReason: user.bannedReason || 'Terms of Service violation',
+      })
+    }
+
     const token = generateToken(user._id, user.tasteProfileComplete)
     sendTokenCookie(res, token)
 
@@ -244,6 +259,8 @@ const loginUser = async (req, res, next) => {
       firstName: user.firstName,
       lastName:  user.lastName,
       email:     user.email,
+      role:      user.role || 'user',
+      isBanned:  user.isBanned || false,
       profilePicture: user.profilePicture || null,
       tasteProfileComplete: user.tasteProfileComplete || false,
       token,

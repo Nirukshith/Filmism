@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { Link, useSearchParams } from 'react-router-dom'
-import { conversationAPI, matchingAPI } from '../services/api'
+import { conversationAPI, matchingAPI, safetyAPI } from '../services/api'
 import UserAvatar from '../components/UserAvatar'
 import ReportModal from '../components/ReportModal'
 import BlockConfirmModal from '../components/BlockConfirmModal'
@@ -520,6 +520,79 @@ const SendButton = styled.button`
   }
 `
 
+const BlockedBadge = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+`
+
+const BlockedBanner = styled.div`
+  padding: 0.95rem 1.4rem;
+  border-top: 1.5px solid #fee2e2;
+  background: #fffafa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+`
+
+const BlockedText = styled.div`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.8rem;
+  color: #991b1b;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  span.icon {
+    display: inline-flex;
+    color: #dc2626;
+  }
+
+  strong {
+    color: #7f1d1d;
+  }
+`
+
+const UnblockButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: #111827;
+  color: #fff;
+  border: 1.5px solid #111827;
+  border-radius: 6px;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: #ff751f;
+    border-color: #ff751f;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
 const EmptySelection = styled.div`
   margin: auto;
   text-align: center;
@@ -575,10 +648,17 @@ export default function Messages() {
   const [requests, setRequests] = useState({ incoming: [], outgoing: [] })
   const [activeConvId, setActiveConvId] = useState(initialConvId || null)
   const [activePartner, setActivePartner] = useState(null)
+  const [activeConvBlockStatus, setActiveConvBlockStatus] = useState({
+    isBlocked: false,
+    isBlockedByMe: false,
+    isBlockedByPartner: false,
+    canMessage: true,
+  })
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
   const [loadingConv, setLoadingConv] = useState(true)
   const [sending, setSending] = useState(false)
+  const [unblocking, setUnblocking] = useState(false)
 
   // Safety Modals State
   const [showReportModal, setShowReportModal] = useState(false)
@@ -640,6 +720,15 @@ export default function Messages() {
           setActivePartner(res.data.partner)
         }
 
+        if (res.data) {
+          setActiveConvBlockStatus({
+            isBlocked: Boolean(res.data.isBlocked),
+            isBlockedByMe: Boolean(res.data.isBlockedByMe),
+            isBlockedByPartner: Boolean(res.data.isBlockedByPartner),
+            canMessage: res.data.canMessage !== false && !res.data.isBlocked,
+          })
+        }
+
         if (res.data?.messages) {
           if (isPolling) {
             if (res.data.messages.length > 0) {
@@ -698,7 +787,7 @@ export default function Messages() {
   // 3. Send Message Handler
   const handleSendMessage = async (e) => {
     e.preventDefault()
-    if (!inputText.trim() || !activeConvId || sending) return
+    if (!inputText.trim() || !activeConvId || sending || activeConvBlockStatus.isBlocked) return
 
     const textToSend = inputText.trim()
     setInputText('')
@@ -746,12 +835,35 @@ export default function Messages() {
     }
   }
 
-  // 5. Block / Report Callback Handlers
+  // 5. Block / Unblock / Report Handlers
   const handleUserBlocked = () => {
-    setActiveConvId(null)
-    setActivePartner(null)
-    setMessages([])
+    setActiveConvBlockStatus({
+      isBlocked: true,
+      isBlockedByMe: true,
+      isBlockedByPartner: false,
+      canMessage: false,
+    })
     loadSidebarData()
+    fetchMessages(false)
+  }
+
+  const handleUnblockActiveUser = async () => {
+    if (!activePartner?.userId) return
+    setUnblocking(true)
+    try {
+      await safetyAPI.unblockUser(activePartner.userId)
+      setActiveConvBlockStatus({
+        isBlocked: false,
+        isBlockedByMe: false,
+        isBlockedByPartner: false,
+        canMessage: true,
+      })
+      await Promise.all([fetchMessages(false), loadSidebarData()])
+    } catch (err) {
+      console.error('Failed to unblock user:', err)
+    } finally {
+      setUnblocking(false)
+    }
   }
 
   const formatTime = (dateStr) => {
@@ -830,13 +942,24 @@ export default function Messages() {
                           <ConvName $unread={conv.hasUnread}>
                             {conv.partner?.firstName || 'Twin'}
                           </ConvName>
-                          <ConvTime>{formatTime(conv.lastMessageAt)}</ConvTime>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            {conv.isBlocked && (
+                              <BlockedBadge>
+                                {conv.isBlockedByMe ? 'Blocked' : 'Unavailable'}
+                              </BlockedBadge>
+                            )}
+                            <ConvTime>{formatTime(conv.lastMessageAt)}</ConvTime>
+                          </div>
                         </ConvNameRow>
                         <ConvSnippet $unread={conv.hasUnread}>
-                          {conv.lastMessage?.text || 'Connected! Say hello.'}
+                          {conv.isBlockedByMe
+                            ? '🚫 You have blocked this user'
+                            : conv.isBlocked
+                            ? '🚫 This conversation is blocked'
+                            : conv.lastMessage?.text || 'Connected! Say hello.'}
                         </ConvSnippet>
                       </ConvInfo>
-                      {conv.hasUnread && (
+                      {conv.hasUnread && !conv.isBlocked && (
                         <div
                           style={{
                             width: 8,
@@ -900,30 +1023,50 @@ export default function Messages() {
                     )}
                   </AvatarPlaceholder>
                   <div>
-                    <PartnerName>{activePartner?.firstName || 'Cinephile Twin'}</PartnerName>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <PartnerName>{activePartner?.firstName || 'Cinephile Twin'}</PartnerName>
+                      {activeConvBlockStatus.isBlocked && (
+                        <BlockedBadge>
+                          {activeConvBlockStatus.isBlockedByMe ? 'Blocked by you' : 'Blocked'}
+                        </BlockedBadge>
+                      )}
+                    </div>
                     <span style={{ fontSize: '0.7rem', color: '#888', fontFamily: 'Lexend Deca, sans-serif' }}>
                       Cinephile Twin Connection
                     </span>
                   </div>
                 </PartnerHeader>
 
-                {/* Direct Safety Buttons (Never buried!) */}
+                {/* Direct Safety Buttons */}
                 <HeaderActions>
-                  <SafetyBtn
-                    onClick={() => setShowReportModal(true)}
-                    title="Report user for abusive or inappropriate behavior"
-                    id="report-user-btn"
-                  >
-                    <ShieldAlertIcon size={13} /> Report
-                  </SafetyBtn>
-                  <SafetyBtn
-                    $variant="danger"
-                    onClick={() => setShowBlockModal(true)}
-                    title="Block this user"
-                    id="block-user-btn"
-                  >
-                    <BlockIcon size={13} /> Block
-                  </SafetyBtn>
+                  {activeConvBlockStatus.isBlockedByMe ? (
+                    <SafetyBtn
+                      onClick={handleUnblockActiveUser}
+                      disabled={unblocking}
+                      title="Unblock this user to message them"
+                      id="unblock-user-header-btn"
+                    >
+                      <CheckIcon size={13} /> {unblocking ? 'Unblocking...' : 'Unblock'}
+                    </SafetyBtn>
+                  ) : (
+                    <>
+                      <SafetyBtn
+                        onClick={() => setShowReportModal(true)}
+                        title="Report user for abusive or inappropriate behavior"
+                        id="report-user-btn"
+                      >
+                        <ShieldAlertIcon size={13} /> Report
+                      </SafetyBtn>
+                      <SafetyBtn
+                        $variant="danger"
+                        onClick={() => setShowBlockModal(true)}
+                        title="Block this user"
+                        id="block-user-btn"
+                      >
+                        <BlockIcon size={13} /> Block
+                      </SafetyBtn>
+                    </>
+                  )}
                 </HeaderActions>
               </ChatHeader>
 
@@ -951,24 +1094,51 @@ export default function Messages() {
                 <div ref={messagesEndRef} />
               </MessagesContainer>
 
-              <ChatInputArea onSubmit={handleSendMessage}>
-                <Input
-                  type="text"
-                  placeholder={`Message ${activePartner?.firstName || 'your twin'}...`}
-                  value={inputText}
-                  maxLength={1000}
-                  onChange={(e) => setInputText(e.target.value)}
-                  autoFocus
-                  id="chat-message-input"
-                />
-                <SendButton
-                  type="submit"
-                  disabled={!inputText.trim() || sending}
-                  id="send-message-btn"
-                >
-                  <SendIcon size={15} /> Send
-                </SendButton>
-              </ChatInputArea>
+              {/* Chat Input or Blocked Banner */}
+              {activeConvBlockStatus.isBlockedByMe ? (
+                <BlockedBanner>
+                  <BlockedText>
+                    <span className="icon"><BlockIcon size={16} /></span>
+                    <span>
+                      You have blocked <strong>{activePartner?.firstName || 'this user'}</strong>. Unblock them to send a message.
+                    </span>
+                  </BlockedText>
+                  <UnblockButton
+                    onClick={handleUnblockActiveUser}
+                    disabled={unblocking}
+                    id="unblock-user-input-btn"
+                  >
+                    <CheckIcon size={13} />
+                    {unblocking ? 'Unblocking...' : 'Unblock User'}
+                  </UnblockButton>
+                </BlockedBanner>
+              ) : activeConvBlockStatus.isBlockedByPartner ? (
+                <BlockedBanner>
+                  <BlockedText>
+                    <span className="icon"><BlockIcon size={16} /></span>
+                    <span>You cannot send messages to this conversation.</span>
+                  </BlockedText>
+                </BlockedBanner>
+              ) : (
+                <ChatInputArea onSubmit={handleSendMessage}>
+                  <Input
+                    type="text"
+                    placeholder={`Message ${activePartner?.firstName || 'your twin'}...`}
+                    value={inputText}
+                    maxLength={1000}
+                    onChange={(e) => setInputText(e.target.value)}
+                    autoFocus
+                    id="chat-message-input"
+                  />
+                  <SendButton
+                    type="submit"
+                    disabled={!inputText.trim() || sending}
+                    id="send-message-btn"
+                  >
+                    <SendIcon size={15} /> Send
+                  </SendButton>
+                </ChatInputArea>
+              )}
             </>
           ) : (
             <EmptySelection>

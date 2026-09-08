@@ -59,7 +59,7 @@ const reportSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['open', 'reviewed', 'actioned', 'dismissed'],
+      enum: ['open', 'in_review', 'reviewed', 'resolved', 'actioned', 'dismissed'],
       default: 'open',
       index: true,
     },

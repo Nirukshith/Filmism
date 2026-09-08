@@ -9,6 +9,7 @@ import CinephileTwin from './pages/CinephileTwin'
 import Messages from './pages/Messages'
 import LoginPage from './pages/AuthLogin'
 import RegisterPage from './pages/Register'
+import AdminDashboard from './pages/AdminDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -79,6 +80,14 @@ function App() {
           element={
             <ProtectedRoute requireComplete={false}>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requireAdmin={true}>
+              <AdminDashboard />
             </ProtectedRoute>
           }
         />

@@ -44,6 +44,7 @@ app.use('/api/taste-profile', require('./routes/tasteProfileRoutes'))
 app.use('/api/recommendations', require('./routes/recommendationRoutes'))
 app.use('/api/matching', require('./routes/matchRoutes'))
 app.use('/api/conversations', require('./routes/conversationRoutes'))
+app.use('/api/notifications', require('./routes/notificationRoutes'))
 app.use('/api/users', require('./routes/userRoutes'))
 app.use('/api/safety', require('./routes/safetyRoutes'))
 

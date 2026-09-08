@@ -5,6 +5,7 @@ const Conversation = require('../models/conversationModel');
 const MatchRequest = require('../models/matchRequestModel');
 const Message = require('../models/messageModel');
 const User = require('../models/userModel');
+const { sendBanNotificationEmail, sendWarningNotificationEmail } = require('../utils/sendEmail');
 
 /**
  * Block a user:
@@ -194,21 +195,29 @@ async function reportUser(reporterId, reportedUserId, { conversationId, reason, 
   };
 }
 
+const UserTasteProfile = require('../models/userTasteProfileModel');
+
 /**
  * Moderation triage: Retrieve all reports (Admin / Moderator).
  */
 async function getReports({ status, page = 1, limit = 20 } = {}) {
   const query = {};
-  if (status) {
-    query.status = status;
+  if (status && status !== 'all') {
+    if (status === 'in_review') {
+      query.status = { $in: ['in_review', 'reviewed'] };
+    } else if (status === 'resolved') {
+      query.status = { $in: ['resolved', 'actioned'] };
+    } else {
+      query.status = status;
+    }
   }
 
   const skip = (page - 1) * limit;
 
   const [reports, total] = await Promise.all([
     Report.find(query)
-      .populate('reporter', 'firstName lastName email')
-      .populate('reportedUser', 'firstName lastName email')
+      .populate('reporter', 'firstName lastName email profilePicture')
+      .populate('reportedUser', 'firstName lastName email profilePicture isBanned bannedReason bannedAt role')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -232,7 +241,8 @@ async function getReports({ status, page = 1, limit = 20 } = {}) {
 async function updateReportStatus(reportId, { status, adminNotes, actionTaken }) {
   const reportObjId = new mongoose.Types.ObjectId(reportId);
 
-  const updateData = { status };
+  const updateData = {};
+  if (status) updateData.status = status;
   if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
   if (actionTaken !== undefined) updateData.actionTaken = actionTaken;
 
@@ -240,7 +250,10 @@ async function updateReportStatus(reportId, { status, adminNotes, actionTaken })
     reportObjId,
     { $set: updateData },
     { new: true }
-  ).lean();
+  )
+    .populate('reporter', 'firstName lastName email profilePicture')
+    .populate('reportedUser', 'firstName lastName email profilePicture isBanned bannedReason bannedAt role')
+    .lean();
 
   if (!report) {
     const err = new Error('Report not found.');
@@ -248,10 +261,190 @@ async function updateReportStatus(reportId, { status, adminNotes, actionTaken })
     throw err;
   }
 
+  // If a warning was issued to the reported user, dispatch the warning notification email
+  if (actionTaken === 'warning_issued' && report.reportedUser?.email) {
+    sendWarningNotificationEmail(
+      report.reportedUser.email,
+      report.reportedUser.firstName,
+      report.reason,
+      adminNotes
+    ).catch((err) => console.error('Failed to send warning notification email:', err));
+  }
+
   return {
     success: true,
     report,
     message: 'Report updated successfully.',
+  };
+}
+
+/**
+ * Moderation Action: Ban a user permanently or until unbanned.
+ * 1. Sets isBanned: true on User document.
+ * 2. Sets matchingEnabled: false on UserTasteProfile.
+ * 3. Deactivates any active Conversation involving the banned user.
+ * 4. Cancels any pending MatchRequests.
+ * 5. If reportId is provided, updates report status to 'resolved' and actionTaken to 'user_banned'.
+ */
+async function banUser(adminId, userId, reason = 'Violation of community safety guidelines', reportId = null) {
+  const userObjId = new mongoose.Types.ObjectId(userId);
+
+  const user = await User.findById(userObjId);
+  if (!user) {
+    const err = new Error('User not found.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  user.isBanned = true;
+  user.bannedReason = reason;
+  user.bannedAt = new Date();
+  await user.save();
+
+  // Send account suspension notice email
+  if (user.email) {
+    sendBanNotificationEmail(user.email, user.firstName, reason).catch((err) =>
+      console.error('Failed to send ban notification email:', err)
+    );
+  }
+
+  // Deactivate taste profile matching
+  await UserTasteProfile.updateOne(
+    { userId: userObjId },
+    { $set: { matchingEnabled: false } }
+  );
+
+  // Deactivate active conversations
+  await Conversation.updateMany(
+    { participants: userObjId },
+    { $set: { isActive: false } }
+  );
+
+  // Cancel pending match requests
+  await MatchRequest.updateMany(
+    {
+      $or: [{ fromUser: userObjId }, { toUser: userObjId }],
+      status: 'pending',
+    },
+    { $set: { status: 'cancelled', respondedAt: new Date() } }
+  );
+
+  // If a reportId is attached, resolve the report
+  let updatedReport = null;
+  if (reportId) {
+    const reportObjId = new mongoose.Types.ObjectId(reportId);
+    updatedReport = await Report.findByIdAndUpdate(
+      reportObjId,
+      {
+        $set: {
+          status: 'resolved',
+          actionTaken: 'user_banned',
+          adminNotes: `User banned by admin on ${new Date().toISOString()}. Reason: ${reason}`,
+        },
+      },
+      { new: true }
+    )
+      .populate('reporter', 'firstName lastName email profilePicture')
+      .populate('reportedUser', 'firstName lastName email profilePicture isBanned bannedReason bannedAt role')
+      .lean();
+  }
+
+  return {
+    success: true,
+    message: `User ${user.firstName} ${user.lastName} has been banned.`,
+    user: {
+      userId: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      isBanned: true,
+      bannedReason: user.bannedReason,
+      bannedAt: user.bannedAt,
+    },
+    report: updatedReport,
+  };
+}
+
+/**
+ * Moderation Action: Unban a previously banned user.
+ */
+async function unbanUser(adminId, userId) {
+  const userObjId = new mongoose.Types.ObjectId(userId);
+
+  const user = await User.findById(userObjId);
+  if (!user) {
+    const err = new Error('User not found.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  user.isBanned = false;
+  user.bannedReason = null;
+  user.bannedAt = null;
+  await user.save();
+
+  return {
+    success: true,
+    message: `User ${user.firstName} ${user.lastName} has been unbanned.`,
+    user: {
+      userId: user._id,
+      isBanned: false,
+    },
+  };
+}
+
+/**
+ * Moderation Action: List all currently banned users.
+ */
+async function getBannedUsers() {
+  const users = await User.find({ isBanned: true })
+    .select('firstName lastName email profilePicture bannedReason bannedAt createdAt')
+    .sort({ bannedAt: -1 })
+    .lean();
+
+  return users.map((u) => ({
+    _id: u._id,
+    userId: u._id,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    email: u.email,
+    profilePicture: u.profilePicture || null,
+    bannedReason: u.bannedReason || 'Terms of Service violation',
+    bannedAt: u.bannedAt,
+    joinedAt: u.createdAt,
+  }));
+}
+
+/**
+ * Moderation Dashboard: Get overview statistics.
+ */
+async function getAdminStats() {
+  const [
+    totalReports,
+    openReports,
+    inReviewReports,
+    resolvedReports,
+    dismissedReports,
+    bannedUsersCount,
+    totalUsersCount,
+  ] = await Promise.all([
+    Report.countDocuments(),
+    Report.countDocuments({ status: 'open' }),
+    Report.countDocuments({ status: { $in: ['in_review', 'reviewed'] } }),
+    Report.countDocuments({ status: { $in: ['resolved', 'actioned'] } }),
+    Report.countDocuments({ status: 'dismissed' }),
+    User.countDocuments({ isBanned: true }),
+    User.countDocuments(),
+  ]);
+
+  return {
+    totalReports,
+    openReports,
+    inReviewReports,
+    resolvedReports,
+    dismissedReports,
+    bannedUsersCount,
+    totalUsersCount,
   };
 }
 
@@ -262,4 +455,8 @@ module.exports = {
   reportUser,
   getReports,
   updateReportStatus,
+  banUser,
+  unbanUser,
+  getBannedUsers,
+  getAdminStats,
 };

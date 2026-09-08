@@ -16,6 +16,13 @@ const ChatIcon = ({ size = 15 }) => (
   </svg>
 )
 
+const EyeIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
 const SparklesIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -663,6 +670,42 @@ const WatchlistBtn = styled.button`
   }
 `
 
+const DiscoveryActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+`
+
+const AlreadyWatchedBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  padding: 0.65rem 1.25rem;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: #e4e4e4;
+    border-color: #bbb;
+    color: #111;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`
+
 // ─── Opt-In / Empty States ───────────────────────────────────────────────────
 
 const StateCard = styled.div`
@@ -759,6 +802,9 @@ export default function CinephileTwin() {
   const [existingConversationId, setExistingConversationId] = useState(null)
   const [pendingRequestId, setPendingRequestId] = useState(null)
   const [connecting, setConnecting] = useState(false)
+  const [excludedRecommendations, setExcludedRecommendations] = useState([])
+  const [cyclingRecommendation, setCyclingRecommendation] = useState(false)
+  const [allRecommendationsExhausted, setAllRecommendationsExhausted] = useState(false)
 
   // Cooldown countdown timer
   useEffect(() => {
@@ -924,6 +970,45 @@ export default function CinephileTwin() {
       console.error('Failed to cancel connection:', err)
     } finally {
       setConnecting(false)
+    }
+  }
+
+  // Handle already watched film -> recommend another film from this twin
+  const handleAlreadyWatched = async () => {
+    if (!matchData?.recommendedFilm || !matchData?.twin?.userId || cyclingRecommendation) return
+
+    setCyclingRecommendation(true)
+    const currentFilm = matchData.recommendedFilm
+    const newExcluded = [...excludedRecommendations, currentFilm.tmdbId]
+    setExcludedRecommendations(newExcluded)
+
+    try {
+      const res = await matchingAPI.getNextRecommendation({
+        twinUserId: matchData.twin.userId,
+        excludedTmdbIds: newExcluded,
+        watchedFilm: {
+          tmdbId: currentFilm.tmdbId,
+          title: currentFilm.title,
+        },
+      })
+
+      if (res.data?.recommendedFilm) {
+        setMatchData((prev) => ({
+          ...prev,
+          recommendedFilm: res.data.recommendedFilm,
+        }))
+        setWatchlistedDiscovery(false)
+      } else {
+        setAllRecommendationsExhausted(true)
+        setMatchData((prev) => ({
+          ...prev,
+          recommendedFilm: null,
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to get next recommendation:', err)
+    } finally {
+      setCyclingRecommendation(false)
     }
   }
 
@@ -1184,7 +1269,7 @@ export default function CinephileTwin() {
               </SectionCard>
 
               {/* Cross-Pollination Discovery Recommendation */}
-              {matchData.recommendedFilm && (
+              {matchData.recommendedFilm ? (
                 <DiscoveryBanner>
                   <DiscoveryLeft>
                     <DiscoveryPoster>
@@ -1207,23 +1292,41 @@ export default function CinephileTwin() {
                     </DiscoveryInfo>
                   </DiscoveryLeft>
 
-                  <WatchlistBtn
-                    onClick={() => handleAddToWatchlist(matchData.recommendedFilm)}
-                    $saved={watchlistedDiscovery}
-                    id="add-twin-recommendation-btn"
-                  >
-                    {watchlistedDiscovery ? (
-                      <>
-                        <CheckIcon size={14} /> Saved to Watchlist
-                      </>
-                    ) : (
-                      <>
-                        <PlusIcon size={14} /> Save to Watchlist
-                      </>
-                    )}
-                  </WatchlistBtn>
+                  <DiscoveryActions>
+                    <AlreadyWatchedBtn
+                      onClick={handleAlreadyWatched}
+                      disabled={cyclingRecommendation}
+                      id="twin-already-watched-btn"
+                      title="Mark as already watched and find another film from this twin"
+                    >
+                      <EyeIcon size={14} />
+                      {cyclingRecommendation ? 'Finding Next...' : 'Already Watched'}
+                    </AlreadyWatchedBtn>
+
+                    <WatchlistBtn
+                      onClick={() => handleAddToWatchlist(matchData.recommendedFilm)}
+                      $saved={watchlistedDiscovery}
+                      id="add-twin-recommendation-btn"
+                    >
+                      {watchlistedDiscovery ? (
+                        <>
+                          <CheckIcon size={14} /> Saved to Watchlist
+                        </>
+                      ) : (
+                        <>
+                          <PlusIcon size={14} /> Save to Watchlist
+                        </>
+                      )}
+                    </WatchlistBtn>
+                  </DiscoveryActions>
                 </DiscoveryBanner>
-              )}
+              ) : allRecommendationsExhausted ? (
+                <DiscoveryBanner style={{ justifyContent: 'center', textAlign: 'center', padding: '1.75rem' }}>
+                  <p style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.85rem', color: '#666', margin: 0 }}>
+                    🎉 <strong>You're all caught up!</strong> You've explored all top favorites and recommendations from {matchData.twin?.firstName || 'your twin'}.
+                  </p>
+                </DiscoveryBanner>
+              ) : null}
             </ContentGrid>
           </>
         )}

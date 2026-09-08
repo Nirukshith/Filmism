@@ -26,8 +26,22 @@ const respondRequestSchema = z.object({
   }),
 });
 
+const nextTwinRecommendationSchema = z.object({
+  twinUserId: z
+    .string({ required_error: 'twinUserId is required' })
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid twinUserId format'),
+  excludedTmdbIds: z.array(z.number()).optional(),
+  watchedFilm: z
+    .object({
+      tmdbId: z.number(),
+      title: z.string().optional(),
+    })
+    .optional(),
+});
+
 module.exports = {
   optInSchema,
   requestConnectSchema,
   respondRequestSchema,
+  nextTwinRecommendationSchema,
 };

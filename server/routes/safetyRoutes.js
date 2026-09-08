@@ -8,8 +8,12 @@ const {
   reportUser,
   getReports,
   updateReport,
+  banUser,
+  unbanUser,
+  getBannedUsers,
+  getAdminStats,
 } = require('../controllers/safetyController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, adminOnly } = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validateRequest');
 const {
   blockUserSchema,
@@ -50,12 +54,12 @@ const blockLimiter = rateLimit({
 // All safety routes require authentication
 router.use(protect);
 
-// Block routes
+// User-facing Block routes
 router.post('/users/:id/block', blockLimiter, validateRequest(blockUserSchema), blockUser);
 router.post('/users/:id/unblock', blockLimiter, unblockUser);
 router.get('/blocked', getBlockedUsers);
 
-// Report routes
+// User-facing Report route
 router.post(
   '/users/:id/report',
   reportLimiter,
@@ -63,8 +67,12 @@ router.post(
   reportUser
 );
 
-// Moderation / Admin routes
-router.get('/reports', getReports);
-router.patch('/reports/:id', validateRequest(updateReportSchema), updateReport);
+// ─── Administrator & Moderation Routes (Admin Role Required) ───────────────────
+router.get('/stats', adminOnly, getAdminStats);
+router.get('/reports', adminOnly, getReports);
+router.patch('/reports/:id', adminOnly, validateRequest(updateReportSchema), updateReport);
+router.post('/users/:id/ban', adminOnly, banUser);
+router.post('/users/:id/unban', adminOnly, unbanUser);
+router.get('/users/banned', adminOnly, getBannedUsers);
 
 module.exports = router;

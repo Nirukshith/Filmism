@@ -50,13 +50,13 @@ const updateReportSchema = z.object({
       .regex(/^[0-9a-fA-F]{24}$/, 'Invalid report ID format'),
   }),
   body: z.object({
-    status: z.enum(['open', 'reviewed', 'actioned', 'dismissed'], {
+    status: z.enum(['open', 'in_review', 'reviewed', 'resolved', 'actioned', 'dismissed'], {
       errorMap: () => ({
-        message: "Status must be 'open', 'reviewed', 'actioned', or 'dismissed'",
+        message: "Status must be 'open', 'in_review', 'resolved', or 'dismissed'",
       }),
     }),
-    adminNotes: z.string().max(1000).optional(),
-    actionTaken: z.string().max(300).optional(),
+    adminNotes: z.string().max(1000).optional().nullable(),
+    actionTaken: z.string().max(300).optional().nullable(),
   }),
 });
 

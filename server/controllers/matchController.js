@@ -177,6 +177,30 @@ const cancelRequest = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/matching/next-recommendation
+ * Retrieve the next recommended film from the twin (excluding already watched/seen films).
+ */
+const getNextTwinRecommendation = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { twinUserId, excludedTmdbIds } = req.body;
+
+    const nextFilm = await matchingService.getNextTwinRecommendation(
+      userId,
+      twinUserId,
+      excludedTmdbIds || []
+    );
+
+    res.json({
+      success: true,
+      recommendedFilm: nextFilm,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   toggleOptIn,
   getCurrentMatch,
@@ -185,5 +209,6 @@ module.exports = {
   getRequests,
   respondToRequest,
   cancelRequest,
+  getNextTwinRecommendation,
 };
 

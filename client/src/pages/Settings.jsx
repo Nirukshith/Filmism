@@ -1,12 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
-import api, { matchingAPI } from '../services/api'
+import api, { matchingAPI, safetyAPI } from '../services/api'
 import { getAuthStatus } from '../utils/auth'
 import { useTasteProfile } from '../hooks/useTasteProfile'
 import UserAvatar from '../components/UserAvatar'
 
 // ─── Professional SVG Icons ───────────────────────────────────────────────────
+
+const BlockIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+  </svg>
+)
 
 const UserIcon = ({ size = 15 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -99,14 +106,16 @@ const Topbar = styled.header`
   z-index: 30;
 `
 
-const Logo = styled.span`
+const Logo = styled(Link)`
   font-family: 'kare', 'Playfair Display', Georgia, serif;
   font-size: 1.5rem;
   font-weight: 700;
   color: #111;
   letter-spacing: -0.01em;
-  user-select: none;
-  cursor: default;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  &:hover { opacity: 0.85; }
 `
 
 const PageBody = styled.div`
@@ -802,6 +811,125 @@ const OtpNote = styled.p`
   span { color: #ff751f; font-weight: 700; }
 `
 
+const BlockedList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+`
+
+const BlockedItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1.15rem;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #fff;
+    border-color: #d1d5db;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+  }
+`
+
+const BlockedUserInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+`
+
+const BlockedAvatar = styled.div`
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`
+
+const BlockedDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+`
+
+const BlockedName = styled.span`
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #111;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const BlockedMeta = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  color: #888;
+`
+
+const UnblockPillBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.45rem 0.95rem;
+  background: #fff;
+  color: #111;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: #111827;
+    color: #fff;
+    border-color: #111827;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const EmptyBlockedState = styled.div`
+  padding: 3rem 1.5rem;
+  text-align: center;
+  background: #f9fafb;
+  border: 1.5px dashed #e5e7eb;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: #666;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+`
+
 // ─── Image Processing Helper ───────────────────────────────────────────────────
 
 const processImageFile = (file) => {
@@ -888,10 +1016,51 @@ function Settings() {
   const [matchingEnabled, setMatchingEnabled] = useState(false)
   const [matchingStatus, setMatchingStatus] = useState({ loading: false, error: '', success: '' })
 
+  // Blocked users state
+  const [blockedUsers, setBlockedUsers] = useState([])
+  const [loadingBlocked, setLoadingBlocked] = useState(false)
+  const [unblockingIds, setUnblockingIds] = useState({})
+  const [blockedStatus, setBlockedStatus] = useState({ error: '', success: '' })
+
   const activePersonasCount = tasteClusters?.length || 0
   const fullName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || 'Film Enthusiast'
   const initials = ((currentUser?.firstName?.[0] || '') + (currentUser?.lastName?.[0] || '')).toUpperCase() || 'FP'
   const userIdentifier = `FILM-${(currentUser?._id || '0000').slice(-4).toUpperCase()}`
+
+  const fetchBlockedUsers = async () => {
+    setLoadingBlocked(true)
+    setBlockedStatus({ error: '', success: '' })
+    try {
+      const res = await safetyAPI.getBlockedUsers()
+      if (res.data?.blockedUsers) {
+        setBlockedUsers(res.data.blockedUsers)
+      }
+    } catch (err) {
+      setBlockedStatus({ error: err.response?.data?.message || 'Failed to load blocked users.', success: '' })
+    } finally {
+      setLoadingBlocked(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'blocked') {
+      fetchBlockedUsers()
+    }
+  }, [activeTab])
+
+  const handleUnblockUser = async (userId, userName) => {
+    setUnblockingIds((prev) => ({ ...prev, [userId]: true }))
+    setBlockedStatus({ error: '', success: '' })
+    try {
+      await safetyAPI.unblockUser(userId)
+      setBlockedUsers((prev) => prev.filter((b) => b.blockedUser?.userId !== userId))
+      setBlockedStatus({ error: '', success: `Unblocked ${userName || 'user'} successfully.` })
+    } catch (err) {
+      setBlockedStatus({ error: err.response?.data?.message || 'Failed to unblock user.', success: '' })
+    } finally {
+      setUnblockingIds((prev) => ({ ...prev, [userId]: false }))
+    }
+  }
 
   // Fetch summary stats & matching status for display
   useEffect(() => {
@@ -1130,13 +1299,15 @@ function Settings() {
   return (
     <PageWrapper>
       <Topbar>
-        <Logo>Filmism</Logo>
+        <Logo to={currentUser?.role === 'admin' ? '/admin' : '/recommend'}>Filmism</Logo>
         <UserAvatar />
       </Topbar>
 
       <PageBody>
         <Breadcrumb>
-          <Link to="/recommend">Dashboard</Link>
+          <Link to={currentUser?.role === 'admin' ? '/admin' : '/recommend'}>
+            {currentUser?.role === 'admin' ? 'Admin Panel' : 'Dashboard'}
+          </Link>
           <span>›</span>
           <span className="active">Settings</span>
         </Breadcrumb>
@@ -1146,7 +1317,9 @@ function Settings() {
             <span className="icon"><SettingsGearIcon size={22} /></span> Settings
           </PageHeading>
           <PageSub>
-            Manage your profile, cinematic preferences and account settings
+            {currentUser?.role === 'admin'
+              ? 'Manage your administrator account credentials and security settings'
+              : 'Manage your profile, cinematic preferences and account settings'}
           </PageSub>
         </HeaderSection>
 
@@ -1166,11 +1339,20 @@ function Settings() {
               <span className="icon"><LockIcon size={16} /></span> Security
             </TabButton>
             <TabButton
-              $active={activeTab === 'danger'}
-              onClick={() => setActiveTab('danger')}
+              $active={activeTab === 'blocked'}
+              onClick={() => { setActiveTab('blocked'); handleCloseEditor(); }}
+              id="settings-blocked-tab-btn"
             >
-              <span className="icon"><ShieldAlertIcon size={16} /></span> Reset Profile
+              <span className="icon"><BlockIcon size={16} /></span> Blocked Users
             </TabButton>
+            {currentUser?.role !== 'admin' && (
+              <TabButton
+                $active={activeTab === 'danger'}
+                onClick={() => setActiveTab('danger')}
+              >
+                <span className="icon"><ShieldAlertIcon size={16} /></span> Reset Profile
+              </TabButton>
+            )}
           </SidebarTabs>
 
           {/* Right Content */}
@@ -1238,15 +1420,25 @@ function Settings() {
                   <HeroDetails>
                     <HeroName>{fullName}</HeroName>
                     <HeroBadges>
-                      <HeroBadge $accent={true}>Cinephile</HeroBadge>
-                      <HeroBadge>ID: #{userIdentifier}</HeroBadge>
-                      <HeroBadge>{activePersonasCount > 0 ? `${activePersonasCount} Personas Active` : 'Active Taste Profile'}</HeroBadge>
+                      {currentUser?.role === 'admin' ? (
+                        <>
+                          <HeroBadge $accent={true}>Administrator</HeroBadge>
+                          <HeroBadge>Staff Account</HeroBadge>
+                          <HeroBadge>ID: #{userIdentifier}</HeroBadge>
+                        </>
+                      ) : (
+                        <>
+                          <HeroBadge $accent={true}>Cinephile</HeroBadge>
+                          <HeroBadge>ID: #{userIdentifier}</HeroBadge>
+                          <HeroBadge>{activePersonasCount > 0 ? `${activePersonasCount} Personas Active` : 'Active Taste Profile'}</HeroBadge>
+                        </>
+                      )}
                     </HeroBadges>
                   </HeroDetails>
                 </HeroBanner>
 
                 {/* Information Grid */}
-                <InfoGrid>
+                <InfoGrid style={{ gridTemplateColumns: currentUser?.role === 'admin' ? '1fr' : undefined }}>
                   <Card>
                     <CardHeader>
                       <CardTitle>Contact Info</CardTitle>
@@ -1261,95 +1453,101 @@ function Settings() {
                     </DataRow>
                     <DataRow>
                       <DataLabel>Account Status</DataLabel>
-                      <DataValue style={{ color: '#10b981' }}>● Verified Cinephile</DataValue>
+                      <DataValue style={{ color: currentUser?.role === 'admin' ? '#ff751f' : '#10b981' }}>
+                        {currentUser?.role === 'admin' ? '● Verified Administrator' : '● Verified Cinephile'}
+                      </DataValue>
                     </DataRow>
                   </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Cinema Stats</CardTitle>
-                    </CardHeader>
-                    <DataRow>
-                      <DataLabel>Watchlist</DataLabel>
-                      <DataValue>{cinemaStats.watchlistCount} films saved</DataValue>
-                    </DataRow>
-                    <DataRow>
-                      <DataLabel>Film Logs</DataLabel>
-                      <DataValue>{cinemaStats.diaryCount} films logged</DataValue>
-                    </DataRow>
-                  </Card>
+                  {currentUser?.role !== 'admin' && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Cinema Stats</CardTitle>
+                      </CardHeader>
+                      <DataRow>
+                        <DataLabel>Watchlist</DataLabel>
+                        <DataValue>{cinemaStats.watchlistCount} films saved</DataValue>
+                      </DataRow>
+                      <DataRow>
+                        <DataLabel>Film Logs</DataLabel>
+                        <DataValue>{cinemaStats.diaryCount} films logged</DataValue>
+                      </DataRow>
+                    </Card>
+                  )}
                 </InfoGrid>
 
-                {/* Cinephile Twin Matching Section */}
-                <Card style={{ marginTop: '1.25rem' }}>
-                  <CardHeader>
-                    <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <TwinIcon size={14} /> Cinephile Twin Matching
-                    </CardTitle>
-                    {matchingEnabled ? (
-                      <HeroBadge $accent={true}>● Opted In</HeroBadge>
-                    ) : (
-                      <HeroBadge>Off</HeroBadge>
+                {/* Cinephile Twin Matching Section (Consumers only) */}
+                {currentUser?.role !== 'admin' && (
+                  <Card style={{ marginTop: '1.25rem' }}>
+                    <CardHeader>
+                      <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <TwinIcon size={14} /> Cinephile Twin Matching
+                      </CardTitle>
+                      {matchingEnabled ? (
+                        <HeroBadge $accent={true}>● Opted In</HeroBadge>
+                      ) : (
+                        <HeroBadge>Off</HeroBadge>
+                      )}
+                    </CardHeader>
+                    <ToggleContainer>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <span style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.92rem', fontWeight: 600, color: '#111' }}>
+                          Let other cinephiles with similar taste find you
+                        </span>
+                        <p style={{ margin: 0, fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.78rem', color: '#666', lineHeight: 1.45 }}>
+                          When enabled, our vector matching engine pairs you with cinephiles who share your aesthetic personas and film favorites. Only your first name, avatar, and taste overlap are visible to your matches. Your email and private watch data are never shared.
+                        </p>
+                      </div>
+                      <ToggleSwitch>
+                        <input
+                          type="checkbox"
+                          id="cinephile-twin-toggle"
+                          checked={matchingEnabled}
+                          onChange={handleToggleMatching}
+                          disabled={matchingStatus.loading}
+                          style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                        />
+                        <ToggleSlider $checked={matchingEnabled} onClick={handleToggleMatching} />
+                      </ToggleSwitch>
+                    </ToggleContainer>
+
+                    {matchingStatus.loading && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#ff751f', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        Updating preference...
+                      </div>
                     )}
-                  </CardHeader>
-                  <ToggleContainer>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <span style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.92rem', fontWeight: 600, color: '#111' }}>
-                        Let other cinephiles with similar taste find you
-                      </span>
-                      <p style={{ margin: 0, fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.78rem', color: '#666', lineHeight: 1.45 }}>
-                        When enabled, our vector matching engine pairs you with cinephiles who share your aesthetic personas and film favorites. Only your first name, avatar, and taste overlap are visible to your matches. Your email and private watch data are never shared.
-                      </p>
-                    </div>
-                    <ToggleSwitch>
-                      <input
-                        type="checkbox"
-                        id="cinephile-twin-toggle"
-                        checked={matchingEnabled}
-                        onChange={handleToggleMatching}
-                        disabled={matchingStatus.loading}
-                        style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                      />
-                      <ToggleSlider $checked={matchingEnabled} onClick={handleToggleMatching} />
-                    </ToggleSwitch>
-                  </ToggleContainer>
+                    {matchingStatus.success && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#10b981', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        {matchingStatus.success}
+                      </div>
+                    )}
+                    {matchingStatus.error && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#dc2626', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        {matchingStatus.error}
+                      </div>
+                    )}
 
-                  {matchingStatus.loading && (
-                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#ff751f', fontFamily: 'Lexend Deca, sans-serif' }}>
-                      Updating preference...
-                    </div>
-                  )}
-                  {matchingStatus.success && (
-                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#10b981', fontFamily: 'Lexend Deca, sans-serif' }}>
-                      {matchingStatus.success}
-                    </div>
-                  )}
-                  {matchingStatus.error && (
-                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#dc2626', fontFamily: 'Lexend Deca, sans-serif' }}>
-                      {matchingStatus.error}
-                    </div>
-                  )}
-
-                  {matchingEnabled && (
-                    <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #f0f0f0' }}>
-                      <Link
-                        to="/twin"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.45rem',
-                          fontFamily: 'Lexend Deca, sans-serif',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          color: '#ff751f',
-                          textDecoration: 'none',
-                        }}
-                      >
-                        <TwinIcon size={14} /> Meet Your Cinephile Twin →
-                      </Link>
-                    </div>
-                  )}
-                </Card>
+                    {matchingEnabled && (
+                      <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #f0f0f0' }}>
+                        <Link
+                          to="/twin"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            fontFamily: 'Lexend Deca, sans-serif',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            color: '#ff751f',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <TwinIcon size={14} /> Meet Your Cinephile Twin →
+                        </Link>
+                      </div>
+                    )}
+                  </Card>
+                )}
 
                 {/* Quick Actions */}
                 {!isEditingProfile && (
@@ -1525,7 +1723,69 @@ function Settings() {
               </FormSection>
             )}
 
-            {/* ── TAB 3: RESET PROFILE ── */}
+            {/* ── TAB 3: BLOCKED USERS ── */}
+            {activeTab === 'blocked' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Blocked Users</CardTitle>
+                </CardHeader>
+                <p style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', color: '#666', marginTop: 0, marginBottom: '1.25rem' }}>
+                  Users you have blocked cannot message you or view your direct connection profile. You can unblock them here at any time.
+                </p>
+
+                {blockedStatus.error && <ErrorText style={{ display: 'block', marginBottom: '1rem' }}>{blockedStatus.error}</ErrorText>}
+                {blockedStatus.success && <SuccessText style={{ display: 'block', marginBottom: '1rem' }}>{blockedStatus.success}</SuccessText>}
+
+                {loadingBlocked ? (
+                  <EmptyBlockedState>Loading blocked users...</EmptyBlockedState>
+                ) : blockedUsers.length === 0 ? (
+                  <EmptyBlockedState>
+                    <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🛡️</span>
+                    <strong style={{ color: '#111' }}>No blocked users</strong>
+                    <span>You haven't blocked any users yet.</span>
+                  </EmptyBlockedState>
+                ) : (
+                  <BlockedList>
+                    {blockedUsers.map((item) => {
+                      const u = item.blockedUser || {}
+                      const initials = (u.firstName?.[0] || 'U').toUpperCase()
+                      const isUnblocking = Boolean(unblockingIds[u.userId])
+
+                      return (
+                        <BlockedItem key={item.blockId || u.userId}>
+                          <BlockedUserInfo>
+                            <BlockedAvatar>
+                              {u.profilePicture ? (
+                                <img src={u.profilePicture} alt="" />
+                              ) : (
+                                initials
+                              )}
+                            </BlockedAvatar>
+                            <BlockedDetails>
+                              <BlockedName>{u.firstName || 'Cinephile'}</BlockedName>
+                              <BlockedMeta>
+                                {item.reason ? `Reason: ${item.reason} • ` : ''}
+                                Blocked on {new Date(item.blockedAt).toLocaleDateString()}
+                              </BlockedMeta>
+                            </BlockedDetails>
+                          </BlockedUserInfo>
+
+                          <UnblockPillBtn
+                            onClick={() => handleUnblockUser(u.userId, u.firstName)}
+                            disabled={isUnblocking}
+                            id={`unblock-btn-${u.userId}`}
+                          >
+                            {isUnblocking ? 'Unblocking...' : 'Unblock'}
+                          </UnblockPillBtn>
+                        </BlockedItem>
+                      )
+                    })}
+                  </BlockedList>
+                )}
+              </Card>
+            )}
+
+            {/* ── TAB 4: RESET PROFILE ── */}
             {activeTab === 'danger' && (
               <DangerCard>
                 <DangerTitle>Reset Taste Profile</DangerTitle>

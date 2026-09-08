@@ -3,39 +3,44 @@ const Conversation = require('../models/conversationModel');
 const Message = require('../models/messageModel');
 const Block = require('../models/blockModel');
 const User = require('../models/userModel');
+const notificationService = require('./notificationService');
 
 /**
  * Retrieve all active conversations for the authenticated user,
- * populated with partner public profile data and unread status.
+ * populated with partner public profile data, unread status, and block status.
  */
 async function getUserConversations(userId) {
   const userObjId = new mongoose.Types.ObjectId(userId);
 
-  // 1. Identify all blocked partners for this user
+  // 1. Identify all block relations involving this user
   const blocks = await Block.find({
     $or: [{ blocker: userObjId }, { blocked: userObjId }],
   }).lean();
-
-  const blockedUserIds = blocks.map((b) =>
-    b.blocker.toString() === userObjId.toString() ? b.blocked : b.blocker
-  );
 
   // 2. Fetch conversations where user is a participant and not archived by this user
   const conversations = await Conversation.find({
     participants: userObjId,
     archivedBy: { $ne: userObjId },
-    userA: { $nin: blockedUserIds },
-    userB: { $nin: blockedUserIds },
   })
     .populate('participants', 'firstName lastName profilePicture')
     .sort({ lastMessageAt: -1 })
     .lean();
 
-  // 3. Format conversations with partner details and unread indicator
+  // 3. Format conversations with partner details, block status, and unread indicator
   return conversations.map((conv) => {
     const partner = conv.participants.find(
       (p) => p._id.toString() !== userObjId.toString()
     );
+
+    const partnerIdStr = partner?._id?.toString();
+
+    const isBlockedByMe = blocks.some(
+      (b) => b.blocker.toString() === userObjId.toString() && b.blocked.toString() === partnerIdStr
+    );
+    const isBlockedByPartner = blocks.some(
+      (b) => b.blocker.toString() === partnerIdStr && b.blocked.toString() === userObjId.toString()
+    );
+    const isBlocked = isBlockedByMe || isBlockedByPartner;
 
     const userReadState = (conv.readState || []).find(
       (rs) => rs.user.toString() === userObjId.toString()
@@ -49,7 +54,7 @@ async function getUserConversations(userId) {
       conv.lastMessage?.sender &&
       conv.lastMessage.sender.toString() !== userObjId.toString();
 
-    const hasUnread = isLastMessageFromPartner && lastMessageSentAt > lastReadAt;
+    const hasUnread = !isBlocked && isLastMessageFromPartner && lastMessageSentAt > lastReadAt;
 
     return {
       conversationId: conv._id,
@@ -67,6 +72,10 @@ async function getUserConversations(userId) {
         : null,
       lastMessageAt: conv.lastMessageAt,
       hasUnread,
+      isBlocked,
+      isBlockedByMe,
+      isBlockedByPartner,
+      canMessage: !isBlocked,
       isActive: conv.isActive !== false,
       createdAt: conv.createdAt,
     };
@@ -106,27 +115,19 @@ async function getConversationMessages(userId, conversationId, options = {}) {
   const partner = conversation.participants.find(
     (p) => p._id.toString() !== userObjId.toString()
   );
+  const partnerIdStr = partner?._id?.toString();
 
   // 2. Check if either user has blocked the other
-  const isBlocked = await Block.findOne({
+  const blockRecord = await Block.findOne({
     $or: [
       { blocker: userObjId, blocked: partner?._id },
       { blocker: partner?._id, blocked: userObjId },
     ],
   }).lean();
 
-  if (isBlocked) {
-    return {
-      conversationId: conversation._id,
-      partner: {
-        userId: partner?._id,
-        firstName: partner?.firstName || 'Cinephile Twin',
-        profilePicture: null,
-      },
-      isBlocked: true,
-      messages: [],
-    };
-  }
+  const isBlockedByMe = Boolean(blockRecord && blockRecord.blocker.toString() === userObjId.toString());
+  const isBlockedByPartner = Boolean(blockRecord && blockRecord.blocker.toString() === partnerIdStr);
+  const isBlocked = Boolean(blockRecord);
 
   // 3. Build message query with cursor support
   const query = { conversationId: convObjId };
@@ -143,11 +144,16 @@ async function getConversationMessages(userId, conversationId, options = {}) {
     .lean();
 
   // 4. Update user's read state
-  if (messages.length > 0 || !options.since) {
+  if ((messages.length > 0 || !options.since) && !isBlocked) {
     await Conversation.updateOne(
       { _id: convObjId, 'readState.user': userObjId },
       { $set: { 'readState.$.lastReadAt': new Date() } }
     );
+    try {
+      await notificationService.markConversationNotificationsAsRead(userObjId, convObjId);
+    } catch (notifErr) {
+      console.error('Failed to mark conversation notifications as read:', notifErr.message);
+    }
   }
 
   return {
@@ -157,7 +163,10 @@ async function getConversationMessages(userId, conversationId, options = {}) {
       firstName: partner?.firstName || 'Cinephile Twin',
       profilePicture: partner?.profilePicture || null,
     },
-    isBlocked: false,
+    isBlocked,
+    isBlockedByMe,
+    isBlockedByPartner,
+    canMessage: !isBlocked,
     messages: messages.map((m) => ({
       messageId: m._id,
       conversationId: m.conversationId,
@@ -199,14 +208,19 @@ async function sendMessage(userId, conversationId, text) {
   );
 
   // 2. Check if either user has blocked the other
-  const isBlocked = await Block.findOne({
+  const blockRecord = await Block.findOne({
     $or: [
       { blocker: userObjId, blocked: partnerId },
       { blocker: partnerId, blocked: userObjId },
     ],
   }).lean();
 
-  if (isBlocked) {
+  if (blockRecord) {
+    if (blockRecord.blocker.toString() === userObjId.toString()) {
+      const err = new Error('You have blocked this user. Please unblock them to send a message.');
+      err.statusCode = 403;
+      throw err;
+    }
     const err = new Error('Cannot send message to this conversation.');
     err.statusCode = 403;
     throw err;
@@ -243,6 +257,27 @@ async function sendMessage(userId, conversationId, text) {
 
   await conversation.save();
 
+  // 5. Trigger non-blocking notification for recipient
+  try {
+    const senderUser = await User.findById(userObjId).select('firstName lastName').lean();
+    const senderName = senderUser?.firstName || 'Your Cinephile Twin';
+    const previewText = message.text.length > 80 ? message.text.substring(0, 77) + '...' : message.text;
+
+    await notificationService.createNotification({
+      recipient: partnerId,
+      sender: userObjId,
+      type: 'new_message',
+      title: `Message from ${senderName}`,
+      body: previewText,
+      data: {
+        conversationId: convObjId,
+        messageId: message._id,
+      },
+    });
+  } catch (notifErr) {
+    console.error('Failed to create message notification:', notifErr.message);
+  }
+
   return {
     messageId: message._id,
     conversationId: message.conversationId,
@@ -270,6 +305,12 @@ async function markConversationRead(userId, conversationId) {
       { _id: convObjId, participants: userObjId },
       { $addToSet: { readState: { user: userObjId, lastReadAt: new Date() } } }
     );
+  }
+
+  try {
+    await notificationService.markConversationNotificationsAsRead(userObjId, convObjId);
+  } catch (notifErr) {
+    console.error('Failed to mark conversation notifications as read:', notifErr.message);
   }
 
   return { success: true };
