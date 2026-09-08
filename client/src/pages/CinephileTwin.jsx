@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
-import api, { matchingAPI } from '../services/api'
+import api, { matchingAPI, conversationAPI } from '../services/api'
 import UserAvatar from '../components/UserAvatar'
 import { getAuthStatus } from '../utils/auth'
 
@@ -9,6 +9,12 @@ const TMDB_IMG = 'https://image.tmdb.org/t/p/w342'
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/w780'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
+
+const ChatIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+)
 
 const SparklesIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -291,6 +297,55 @@ const MatchedDate = styled.span`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.74rem;
   color: #999;
+`
+
+const ConnectStatusRow = styled.div`
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+`
+
+const ConnectActionBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 1.15rem;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  ${({ $variant }) =>
+    $variant === 'connected'
+      ? `
+        background: #2e7d32;
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(46, 125, 50, 0.3);
+        &:hover { background: #256729; transform: translateY(-1px); }
+      `
+      : $variant === 'pending'
+      ? `
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        &:hover { background: rgba(255, 255, 255, 0.25); }
+      `
+      : `
+        background: #ff751f;
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(255, 117, 31, 0.4);
+        &:hover { background: #e0600f; transform: translateY(-1px); }
+      `}
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 `
 
 // Score Gauge
@@ -699,6 +754,12 @@ export default function CinephileTwin() {
   const [cooldownSeconds, setCooldownSeconds] = useState(0)
   const [watchlistedDiscovery, setWatchlistedDiscovery] = useState(false)
 
+  // Connection State
+  const [connectionStatus, setConnectionStatus] = useState('none') // 'none' | 'connected' | 'outgoing_pending' | 'incoming_pending'
+  const [existingConversationId, setExistingConversationId] = useState(null)
+  const [pendingRequestId, setPendingRequestId] = useState(null)
+  const [connecting, setConnecting] = useState(false)
+
   // Cooldown countdown timer
   useEffect(() => {
     if (cooldownSeconds <= 0) return
@@ -708,6 +769,51 @@ export default function CinephileTwin() {
     return () => clearInterval(timer)
   }, [cooldownSeconds])
 
+  // Check connection state with matched twin
+  const checkConnectionStatus = async (twinUserId) => {
+    if (!twinUserId) return
+    try {
+      const [reqRes, convRes] = await Promise.all([
+        matchingAPI.getRequests(),
+        conversationAPI.getConversations(),
+      ])
+
+      // 1. Check if active conversation exists
+      const conv = (convRes.data?.conversations || []).find(
+        (c) => c.partner?.userId?.toString() === twinUserId.toString()
+      )
+      if (conv) {
+        setConnectionStatus('connected')
+        setExistingConversationId(conv.conversationId)
+        return
+      }
+
+      // 2. Check if incoming request exists
+      const incomingReq = (reqRes.data?.incoming || []).find(
+        (r) => r.fromUser?.userId?.toString() === twinUserId.toString()
+      )
+      if (incomingReq) {
+        setConnectionStatus('incoming_pending')
+        setPendingRequestId(incomingReq.requestId)
+        return
+      }
+
+      // 3. Check if outgoing request exists
+      const outgoingReq = (reqRes.data?.outgoing || []).find(
+        (r) => r.toUser?.userId?.toString() === twinUserId.toString()
+      )
+      if (outgoingReq) {
+        setConnectionStatus('outgoing_pending')
+        setPendingRequestId(outgoingReq.requestId)
+        return
+      }
+
+      setConnectionStatus('none')
+    } catch (e) {
+      console.error('Error checking twin connection status:', e)
+    }
+  }
+
   // Fetch current match and matching preference
   const fetchCurrentMatch = async () => {
     setLoading(true)
@@ -715,7 +821,11 @@ export default function CinephileTwin() {
     try {
       const res = await matchingAPI.getCurrentMatch()
       setMatchingEnabled(Boolean(res.data?.matchingEnabled))
-      setMatchData(res.data?.match || null)
+      const match = res.data?.match || null
+      setMatchData(match)
+      if (match?.twin?.userId) {
+        await checkConnectionStatus(match.twin.userId)
+      }
     } catch (err) {
       if (err.response?.status === 404 && err.response?.data?.message?.includes('Taste profile')) {
         setError('Please complete your taste profile onboarding first.')
@@ -750,13 +860,70 @@ export default function CinephileTwin() {
     setError('')
     try {
       const res = await matchingAPI.findMatch()
-      setMatchData(res.data?.match || null)
+      const match = res.data?.match || null
+      setMatchData(match)
       setCooldownSeconds(60) // 60s UI cooldown to prevent spam
+      if (match?.twin?.userId) {
+        await checkConnectionStatus(match.twin.userId)
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to compute match. Please try again soon.')
     } finally {
       setSearching(false)
       setLoading(false)
+    }
+  }
+
+  // Connect request handlers
+  const handleSendConnect = async () => {
+    if (!matchData?.twin?.userId || connecting) return
+    setConnecting(true)
+    try {
+      const res = await matchingAPI.requestConnect({
+        toUserId: matchData.twin.userId,
+        matchId: matchData.matchId,
+      })
+      if (res.data?.status === 'accepted' && res.data?.conversationId) {
+        setConnectionStatus('connected')
+        setExistingConversationId(res.data.conversationId)
+      } else {
+        setConnectionStatus('outgoing_pending')
+        setPendingRequestId(res.data?.requestId)
+      }
+    } catch (err) {
+      console.error('Failed to send connect request:', err)
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  const handleAcceptConnect = async () => {
+    if (!pendingRequestId || connecting) return
+    setConnecting(true)
+    try {
+      const res = await matchingAPI.respondRequest(pendingRequestId, 'accept')
+      if (res.data?.conversationId) {
+        setConnectionStatus('connected')
+        setExistingConversationId(res.data.conversationId)
+      }
+    } catch (err) {
+      console.error('Failed to accept connection:', err)
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  const handleCancelConnect = async () => {
+    if (!pendingRequestId || connecting) return
+    setConnecting(true)
+    try {
+      await matchingAPI.cancelRequest(pendingRequestId)
+      setConnectionStatus('none')
+      setPendingRequestId(null)
+    } catch (err) {
+      console.error('Failed to cancel connection:', err)
+    } finally {
+      setConnecting(false)
     }
   }
 
@@ -781,8 +948,11 @@ export default function CinephileTwin() {
     <PageWrapper>
       {/* Topbar */}
       <Topbar>
-        <Logo>filmism</Logo>
+        <Logo to="/recommend" as={Link} style={{ textDecoration: 'none' }}>filmism</Logo>
         <TopbarRight>
+          <Link to="/recommend" style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: '#555', textDecoration: 'none', textTransform: 'lowercase' }}>dashboard</Link>
+          <Link to="/messages" style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: '#555', textDecoration: 'none', textTransform: 'lowercase' }}>messages</Link>
+          <Link to="/diary" style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: '#555', textDecoration: 'none', textTransform: 'lowercase' }}>diary</Link>
           <UserAvatar />
         </TopbarRight>
       </Topbar>
@@ -891,6 +1061,45 @@ export default function CinephileTwin() {
                   <MatchedDate>
                     Matched {matchData.matchedAt ? new Date(matchData.matchedAt).toLocaleDateString() : 'recently'}
                   </MatchedDate>
+                  <ConnectStatusRow>
+                    {connectionStatus === 'connected' ? (
+                      <ConnectActionBtn
+                        $variant="connected"
+                        onClick={() => navigate(`/messages?conversationId=${existingConversationId}`)}
+                        id="open-twin-chat-btn"
+                      >
+                        <ChatIcon size={14} /> Open Messages 💬
+                      </ConnectActionBtn>
+                    ) : connectionStatus === 'outgoing_pending' ? (
+                      <ConnectActionBtn
+                        $variant="pending"
+                        onClick={handleCancelConnect}
+                        disabled={connecting}
+                        id="cancel-twin-request-btn"
+                        title="Click to cancel pending request"
+                      >
+                        {connecting ? 'Updating...' : 'Request Pending (Cancel)'}
+                      </ConnectActionBtn>
+                    ) : connectionStatus === 'incoming_pending' ? (
+                      <ConnectActionBtn
+                        $variant="primary"
+                        onClick={handleAcceptConnect}
+                        disabled={connecting}
+                        id="accept-twin-request-btn"
+                      >
+                        <CheckIcon size={14} /> Accept Request
+                      </ConnectActionBtn>
+                    ) : (
+                      <ConnectActionBtn
+                        $variant="primary"
+                        onClick={handleSendConnect}
+                        disabled={connecting}
+                        id="connect-twin-btn"
+                      >
+                        <SparklesIcon size={14} /> {connecting ? 'Sending Request...' : 'Connect to Chat'}
+                      </ConnectActionBtn>
+                    )}
+                  </ConnectStatusRow>
                 </TwinMeta>
               </TwinProfileSection>
 

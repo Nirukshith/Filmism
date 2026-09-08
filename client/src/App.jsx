@@ -6,6 +6,7 @@ import Watchlist from './pages/Watchlist'
 import Diary from './pages/Diary'
 import Settings from './pages/Settings'
 import CinephileTwin from './pages/CinephileTwin'
+import Messages from './pages/Messages'
 import LoginPage from './pages/AuthLogin'
 import RegisterPage from './pages/Register'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -62,6 +63,14 @@ function App() {
           element={
             <ProtectedRoute requireComplete={true}>
               <CinephileTwin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute requireComplete={true}>
+              <Messages />
             </ProtectedRoute>
           }
         />

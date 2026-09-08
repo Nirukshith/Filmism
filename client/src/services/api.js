@@ -38,11 +38,37 @@ export const authAPI = {
   resendOtp: (data) => api.post('/auth/resend-otp', data),
 }
 
-// Cinephile Twin matching endpoints
+// Cinephile Twin matching & connection endpoints
 export const matchingAPI = {
   toggleOptIn: (matchingEnabled) => api.patch('/matching/opt-in', { matchingEnabled }),
   getCurrentMatch: () => api.get('/matching/current'),
   findMatch: () => api.post('/matching/find'),
+  requestConnect: (data) => api.post('/matching/request-connect', data),
+  getRequests: () => api.get('/matching/requests'),
+  respondRequest: (id, action) => api.post(`/matching/requests/${id}/respond`, { action }),
+  cancelRequest: (id) => api.post(`/matching/requests/${id}/cancel`),
+}
+
+// Conversations & Messaging endpoints
+export const conversationAPI = {
+  getConversations: () => api.get('/conversations'),
+  getMessages: (conversationId, params = {}) =>
+    api.get(`/conversations/${conversationId}/messages`, { params }),
+  sendMessage: (conversationId, text) =>
+    api.post(`/conversations/${conversationId}/messages`, { text }),
+  markRead: (conversationId) => api.patch(`/conversations/${conversationId}/read`),
+  archiveConversation: (conversationId, archive = true) =>
+    api.post(`/conversations/${conversationId}/archive`, { archive }),
+}
+
+// Safety endpoints (Block & Report)
+export const safetyAPI = {
+  blockUser: (userId, reason) => api.post(`/users/${userId}/block`, { reason }),
+  unblockUser: (userId) => api.post(`/users/${userId}/unblock`),
+  getBlockedUsers: () => api.get('/users/blocked'),
+  reportUser: (userId, data) => api.post(`/users/${userId}/report`, data),
+  getReports: (params = {}) => api.get('/safety/reports', { params }),
+  updateReport: (id, data) => api.patch(`/safety/reports/${id}`, data),
 }
 
 export default api

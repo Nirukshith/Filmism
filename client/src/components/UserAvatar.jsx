@@ -54,6 +54,12 @@ const TwinIcon = ({ size = 14 }) => (
   </svg>
 )
 
+const ChatIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+)
+
 const fadeSlide = keyframes`
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -278,6 +284,10 @@ function UserAvatar() {
             <DropItem to="/twin" onClick={() => setOpen(false)} role="menuitem">
               <span className="icon"><TwinIcon size={14} /></span>
               cinephile twin
+            </DropItem>
+            <DropItem to="/messages" onClick={() => setOpen(false)} role="menuitem">
+              <span className="icon"><ChatIcon size={14} /></span>
+              messages
             </DropItem>
             <DropItem to="/settings" onClick={() => setOpen(false)} role="menuitem">
               <span className="icon"><SettingsIcon size={14} /></span>
