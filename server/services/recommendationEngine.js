@@ -171,7 +171,7 @@ async function generateRankedRecommendations(userProfile, options = {}) {
         }
       }
     });
-  } catch (e) {}
+  } catch (e) { }
 
   // 2. Score each candidate against its best matching cluster and record all matching personas
   const scoredList = [];
@@ -291,7 +291,7 @@ async function generateRankedRecommendations(userProfile, options = {}) {
         cachedRecommendations: diverseRecommendations,
         cachedRecommendationsAt: new Date(),
       }
-    ).catch(() => {});
+    ).catch(() => { });
   }
 
   // 4. Slice for the requested page

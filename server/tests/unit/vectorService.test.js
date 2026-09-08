@@ -107,7 +107,6 @@ describe('Vector Service Unit Tests', () => {
       expect(pipeline[0].$vectorSearch.path).toBe('globalCentroid');
       expect(pipeline[0].$vectorSearch.filter).toEqual({
         matchingEnabled: true,
-        onboardingStage: 'complete',
         userId: { $ne: 'user_123' },
       });
       expect(pipeline[1].$project.userId).toBe(1);

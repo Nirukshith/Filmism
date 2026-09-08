@@ -253,7 +253,8 @@ const getWatchlist = async (req, res, next) => {
 
 /**
  * GET /api/recommendations/diary
- * Return all films the user has marked as watched, with rating + TMDB poster data.
+ * Return all films the user has marked as watched AND their foundational taste profile favorites,
+ * with rating + TMDB poster data.
  */
 const getDiary = async (req, res, next) => {
   try {
@@ -261,48 +262,98 @@ const getDiary = async (req, res, next) => {
     const sessionId = req.query.sessionId;
     const query = userId ? { userId } : { sessionId };
 
+    // 1. Fetch watched recommendation logs
     const logs = await RecommendationLog.find({ ...query, action: 'watched' })
       .sort({ createdAt: -1 })
       .lean();
 
-    if (logs.length === 0) return res.json({ success: true, diary: [] });
+    // 2. Fetch taste profile favorites
+    const profile = await UserTasteProfile.findOne(query).sort({ updatedAt: -1 }).lean();
+    const favorites = Array.isArray(profile?.favorites) ? profile.favorites : [];
 
+    const mapByTmdbId = new Map();
+
+    // Process logs first
+    logs.forEach((log) => {
+      mapByTmdbId.set(Number(log.tmdbId), {
+        tmdbId: Number(log.tmdbId),
+        title: log.title,
+        year: null,
+        genres: [],
+        poster_path: null,
+        outcomeRating: log.outcomeRating,
+        outcomeLabel: log.outcomeLabel || 'good',
+        matchScore: log.matchScore,
+        sourceClusterName: log.sourceClusterName,
+        watchedAt: log.createdAt,
+        isFavorite: false,
+        source: 'watched',
+      });
+    });
+
+    // Process favorites (mark existing or add new)
+    favorites.forEach((fav) => {
+      const id = Number(fav.tmdbId || fav.id);
+      if (!id) return;
+
+      const favRatingLabel =
+        fav.ratingLabel ||
+        (fav.rating === 4 ? 'great' : fav.rating === 3 ? 'good' : fav.rating === 2 ? 'okay' : fav.rating === 1 ? 'not for me' : 'good');
+
+      if (mapByTmdbId.has(id)) {
+        const existing = mapByTmdbId.get(id);
+        existing.isFavorite = true;
+        existing.favoriteRating = fav.rating;
+        if (!existing.title && fav.title) existing.title = fav.title;
+        if (!existing.year && fav.year) existing.year = fav.year;
+        if (!existing.poster_path && fav.posterPath) existing.poster_path = fav.posterPath;
+      } else {
+        mapByTmdbId.set(id, {
+          tmdbId: id,
+          title: fav.title || `Film #${id}`,
+          year: fav.year || null,
+          genres: [],
+          poster_path: fav.posterPath || null,
+          outcomeRating: fav.rating !== undefined ? fav.rating : 3,
+          outcomeLabel: favRatingLabel,
+          matchScore: null,
+          sourceClusterName: null,
+          watchedAt: fav.addedAt || profile?.updatedAt || profile?.createdAt || new Date(),
+          isFavorite: true,
+          source: 'favorite',
+        });
+      }
+    });
+
+    const combinedList = Array.from(mapByTmdbId.values());
+
+    if (combinedList.length === 0) return res.json({ success: true, diary: [] });
+
+    // Enrich missing posters/titles/years via TMDB
     const enriched = await Promise.allSettled(
-      logs.map(async (log) => {
+      combinedList.map(async (item) => {
+        if (item.poster_path && item.title && !item.title.startsWith('Film #') && item.year) {
+          return item;
+        }
         try {
-          const { data } = await tmdb.get(`/movie/${log.tmdbId}`);
+          const { data } = await tmdb.get(`/movie/${item.tmdbId}`);
           return {
-            tmdbId: log.tmdbId,
-            title: data.title || log.title,
-            year: data.release_date ? parseInt(data.release_date.split('-')[0]) : null,
+            ...item,
+            title: data.title || item.title,
+            year: data.release_date ? parseInt(data.release_date.split('-')[0]) : item.year,
             genres: (data.genres || []).map((g) => g.name).slice(0, 3),
-            poster_path: data.poster_path || null,
-            outcomeRating: log.outcomeRating,
-            outcomeLabel: log.outcomeLabel,
-            matchScore: log.matchScore,
-            sourceClusterName: log.sourceClusterName,
-            watchedAt: log.createdAt,
+            poster_path: data.poster_path || item.poster_path,
           };
         } catch {
-          return {
-            tmdbId: log.tmdbId,
-            title: log.title,
-            year: null,
-            genres: [],
-            poster_path: null,
-            outcomeRating: log.outcomeRating,
-            outcomeLabel: log.outcomeLabel,
-            matchScore: log.matchScore,
-            sourceClusterName: log.sourceClusterName,
-            watchedAt: log.createdAt,
-          };
+          return item;
         }
       })
     );
 
     const diary = enriched
       .filter((r) => r.status === 'fulfilled')
-      .map((r) => r.value);
+      .map((r) => r.value)
+      .sort((a, b) => new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime());
 
     res.json({ success: true, diary });
   } catch (error) {

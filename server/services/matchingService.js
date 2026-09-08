@@ -132,8 +132,8 @@ async function findCinephileTwin(userId, options = {}) {
     throw err;
   }
 
-  if (userProfile.onboardingStage !== 'complete' || !userProfile.globalCentroid || userProfile.globalCentroid.length === 0) {
-    const err = new Error('Taste profile onboarding must be complete with a calculated taste centroid to find matches.');
+  if (!userProfile.globalCentroid || userProfile.globalCentroid.length === 0) {
+    const err = new Error('Taste profile must have a calculated taste centroid to find matches. Please select your favorite films in Taste Profile.');
     err.statusCode = 400;
     throw err;
   }
@@ -176,7 +176,6 @@ async function findCinephileTwin(userId, options = {}) {
     let poolQuery = {
       userId: { $nin: excludedUserIds },
       matchingEnabled: true,
-      onboardingStage: 'complete',
       'globalCentroid.0': { $exists: true },
     };
 
@@ -187,7 +186,6 @@ async function findCinephileTwin(userId, options = {}) {
       eligibleProfiles = await UserTasteProfile.find({
         userId: { $ne: requestingUserId },
         matchingEnabled: true,
-        onboardingStage: 'complete',
         'globalCentroid.0': { $exists: true },
       }).lean();
     }

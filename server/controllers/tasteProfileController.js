@@ -1,5 +1,6 @@
 const tasteClusterService = require('../services/tasteClusterService');
 const UserTasteProfile = require('../models/userTasteProfileModel');
+const RecommendationLog = require('../models/recommendationLogModel');
 const jwt = require('jsonwebtoken');
 
 /**
@@ -129,6 +130,16 @@ const updateFavoriteRating = async (req, res, next) => {
       });
     }
 
+    // Also sync RecommendationLog if exists
+    try {
+      await RecommendationLog.updateMany(
+        { ...query, tmdbId: Number(tmdbId) },
+        { $set: { outcomeRating: Number(rating), outcomeLabel: labels[rating] || 'good' } }
+      );
+    } catch (e) {
+      console.warn('RecommendationLog sync on rating edit warning:', e.message);
+    }
+
     // Rebuild clusters with updated weights
     const rebuilt = await tasteClusterService.buildTasteProfileFromFavorites({
       userId,
@@ -142,6 +153,7 @@ const updateFavoriteRating = async (req, res, next) => {
       success: true,
       tasteProfile: rebuilt.tasteProfile,
       clusters: rebuilt.clusters,
+      aiSynthesis: rebuilt.aiSynthesis,
     });
   } catch (error) {
     next(error);

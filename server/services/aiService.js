@@ -4,6 +4,7 @@ const OpenAI = require('openai');
 const GEMINI_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
 const OPENAI_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const OPENROUTER_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
+const DEEPSEEK_KEY = (process.env.DEEPSEEK_API_KEY || '').trim();
 
 const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS, 10) || 10000;
 
@@ -11,6 +12,20 @@ const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS, 10) || 10000;
 let geminiClient = null;
 let openaiClient = null;
 let openrouterClient = null;
+let deepseekClient = null;
+
+if (DEEPSEEK_KEY) {
+  try {
+    deepseekClient = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: DEEPSEEK_KEY,
+      timeout: AI_TIMEOUT_MS,
+      maxRetries: 2,
+    });
+  } catch (err) {
+    console.warn('DeepSeek initialization warning:', err.message);
+  }
+}
 
 if (OPENROUTER_KEY) {
   try {
@@ -293,7 +308,41 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
   "aiSummary": "A concise 1-2 sentence aesthetic distillation capturing the cinematic essence of this film."
 }`;
 
-  // 1. Try OpenRouter (if configured)
+  // 1. Try DeepSeek (if configured)
+  if (deepseekClient) {
+    try {
+      const modelName = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+      const completion = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () =>
+              deepseekClient.chat.completions.create({
+                model: modelName,
+                max_tokens: 1000,
+                messages: [
+                  { role: 'system', content: 'You are an expert film analyst providing structured JSON cinematic profiles.' },
+                  { role: 'user', content: prompt },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+              }),
+            1,
+            500,
+            'DeepSeek Film Analysis'
+          ),
+        AI_TIMEOUT_MS,
+        'DeepSeek Film Analysis'
+      );
+
+      const responseText = completion.choices[0].message.content.trim();
+      const parsed = JSON.parse(responseText);
+      return sanitizeProfile(parsed, movieData);
+    } catch (err) {
+      console.warn('DeepSeek analysis warning:', err.message);
+    }
+  }
+
+  // 2. Try OpenRouter (if configured)
   if (openrouterClient) {
     try {
       const modelName = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';

@@ -7,6 +7,7 @@ import api from '../services/api'
 import PostWatchModal from '../components/PostWatchModal'
 import UserAvatar from '../components/UserAvatar'
 import ReviewGraph from '../components/ReviewGraph'
+import { CINEMAS } from '../constants/data'
 
 // ─── Styled Components ────────────────────────────────────────────────────────
 
@@ -185,19 +186,56 @@ const ClusterTag = styled.button`
   }
 `
 
-const FilterBar = styled.div`
+const FilterContainer = styled.div`
+  background: #fff;
+  border: 1.5px solid #ddd;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+`
+
+const FilterRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+`
+
+const FilterLabel = styled.div`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  min-width: 76px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`
+
+const FilterPillsList = styled.div`
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 1rem;
-  overflow-x: auto;
-  padding-bottom: 2px;
+  flex-wrap: wrap;
+  flex: 1;
 `
 
 const FilterPill = styled.button`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
-  padding: 4px 12px;
+  font-size: 0.74rem;
+  padding: 4px 11px;
   border-radius: 999px;
   border: 1.5px solid ${({ $active }) => ($active ? '#111' : '#ddd')};
   background: ${({ $active }) => ($active ? '#111' : '#fff')};
@@ -206,7 +244,69 @@ const FilterPill = styled.button`
   font-weight: ${({ $active }) => ($active ? '700' : '500')};
   white-space: nowrap;
   transition: all 0.2s;
-  &:hover { border-color: #111; }
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  &:hover {
+    border-color: #111;
+    transform: translateY(-1px);
+  }
+`
+
+const OriginFilterPill = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.74rem;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1.5px solid ${({ $active, $accent }) => ($active ? ($accent || '#111') : ($accent ? `${$accent}55` : '#ddd'))};
+  background: ${({ $active, $activeBg, $tint }) => ($active ? ($activeBg || '#111') : ($tint || '#fff'))};
+  color: ${({ $active, $accent }) => ($active ? ($accent ? '#111' : '#fff') : ($accent || '#444'))};
+  cursor: pointer;
+  font-weight: ${({ $active }) => ($active ? '700' : '500')};
+  white-space: nowrap;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  &:hover {
+    border-color: ${({ $accent }) => $accent || '#111'};
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+`
+
+const ResetFiltersBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #888;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  text-decoration: underline;
+  margin-left: auto;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #e05353;
+  }
+`
+
+const OriginBadge = styled.span`
+  background: ${({ $tint }) => $tint || 'rgba(0,0,0,0.04)'};
+  color: ${({ $accent }) => $accent || '#444'};
+  border: 1px solid ${({ $accent }) => ($accent ? `${$accent}33` : '#e0e0e0')};
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 `
 
 const RecList = styled.div`
@@ -443,7 +543,7 @@ const EndOfListNotice = styled.div`
 
 function Recommendations() {
   const navigate = useNavigate()
-  const { sessionId, tasteClusters, favoriteRatings } = useTasteProfile()
+  const { sessionId, tasteClusters, favoriteRatings, selectedCinemas, userTasteProfile } = useTasteProfile()
   const { user } = getAuthStatus()
   const isReturningUser = localStorage.getItem('filmism_is_returning_user') === 'true'
 
@@ -459,7 +559,9 @@ function Recommendations() {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [activeFilter, setActiveFilter] = useState('all')
+  const [activePersonaFilter, setActivePersonaFilter] = useState('all')
+  const [activeOriginFilter, setActiveOriginFilter] = useState('all')
+  const [userOrigins, setUserOrigins] = useState([])
   const [watchlist, setWatchlist] = useState([])
   const [watchedOutcomes, setWatchedOutcomes] = useState({}) // { [tmdbId]: ratingNumber }
   const [profileRatings, setProfileRatings] = useState({}) // { [tmdbId]: ratingNumber } from onboarding/profile
@@ -467,6 +569,51 @@ function Recommendations() {
   const [activeModalMovie, setActiveModalMovie] = useState(null)
   const [telemetry, setTelemetry] = useState({ hitRate: 88, totalShown: 0 })
   const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Normalize an origin item (number ID, country code, or name) to a CINEMAS object
+  const getOriginInfo = (item) => {
+    if (!item) return null
+    if (typeof item === 'number' || (!isNaN(item) && typeof item === 'string' && item.trim() !== '')) {
+      const found = CINEMAS.find((c) => c && c.id === Number(item))
+      if (found) return found
+    }
+    const raw = String(item).trim()
+    const cleanStr = raw.toLowerCase().replace(/ cinema$/i, '').trim()
+
+    // Aliases & Country code normalizations
+    if (cleanStr === 'us' || cleanStr === 'usa') return CINEMAS.find((c) => c.id === 1) // Hollywood
+    if (cleanStr === 'fr') return CINEMAS.find((c) => c.id === 2) // French Cinema
+    if (cleanStr === 'jp') return CINEMAS.find((c) => c.id === 3) // Japanese Cinema
+    if (cleanStr === 'gb' || cleanStr === 'uk') return CINEMAS.find((c) => c.id === 4) // British Cinema
+    if (cleanStr === 'de') return CINEMAS.find((c) => c.id === 5) // German Cinema
+    if (cleanStr === 'it') return CINEMAS.find((c) => c.id === 6) // Italian Cinema
+    if (cleanStr === 'ru') return CINEMAS.find((c) => c.id === 7) // Russian Cinema
+    if (cleanStr === 'kr') return CINEMAS.find((c) => c.id === 8) // Korean Cinema
+    if (cleanStr === 'in') return CINEMAS.find((c) => c.id === 9) // Indian Cinema
+    if (cleanStr === 'cn') return CINEMAS.find((c) => c.id === 10) // Chinese Cinema
+    if (cleanStr === 'es') return CINEMAS.find((c) => c.id === 11) // Spanish Cinema
+    if (['se', 'no', 'dk', 'fi', 'is', 'nordic'].includes(cleanStr)) return CINEMAS.find((c) => c.id === 12) // Scandinavian Cinema
+    if (cleanStr === 'br') return CINEMAS.find((c) => c.id === 13) // Brazilian Cinema
+    if (cleanStr === 'mx') return CINEMAS.find((c) => c.id === 14) // Mexican Cinema
+
+    const foundByNameOrCode = CINEMAS.find(
+      (c) =>
+        (c?.name && c.name.toLowerCase() === raw.toLowerCase()) ||
+        (c?.countryCode && c.countryCode.toLowerCase() === raw.toLowerCase()) ||
+        (c?.countryCode && c.countryCode.toLowerCase() === cleanStr) ||
+        (c?.name && c.name.toLowerCase().replace(/ cinema$/i, '').trim() === cleanStr)
+    )
+    if (foundByNameOrCode) return foundByNameOrCode
+
+    return {
+      id: raw,
+      name: raw,
+      countryCode: '',
+      accent: '#475569',
+      tint: 'rgba(71, 85, 105, 0.08)',
+      activeBg: 'rgba(71, 85, 105, 0.18)',
+    }
+  }
 
   const fetchRecommendations = async (pageNum = 1, append = false, refresh = false) => {
     if (refresh) setIsRefreshing(true)
@@ -486,6 +633,10 @@ function Recommendations() {
         const newRecs = recsRes.value.data.recommendations
         setHasMore(recsRes.value.data.hasMore !== undefined ? recsRes.value.data.hasMore : newRecs.length >= 12)
         setPage(pageNum)
+
+        if (recsRes.value.data.selectedOrigins?.length > 0) {
+          setUserOrigins((prev) => Array.from(new Set([...prev, ...recsRes.value.data.selectedOrigins])))
+        }
 
         if (append) {
           setRecommendations((prev) => {
@@ -509,10 +660,17 @@ function Recommendations() {
     }
   }
 
-  // Fetch recommendations — force refresh if user just logged in
+  // Fetch recommendations and profile data
   useEffect(() => {
     const fetchInitialData = async () => {
-      // 1. Fetch user's existing logs so already watchlisted/watched movies are excluded on first render
+      // Initialize user origins from taste context if present
+      if (selectedCinemas?.length > 0) {
+        setUserOrigins(selectedCinemas)
+      } else if (userTasteProfile?.selectedOrigins?.length > 0) {
+        setUserOrigins(userTasteProfile.selectedOrigins)
+      }
+
+      // 1. Fetch user's existing logs and profile data
       try {
         const [wRes, dRes, pRes] = await Promise.allSettled([
           api.get('/recommendations/watchlist', { params: { sessionId } }),
@@ -530,13 +688,19 @@ function Recommendations() {
           })
           setWatchedOutcomes(outcomes)
         }
-        if (pRes.status === 'fulfilled' && pRes.value.data?.tasteProfile?.favorites) {
-          const pRatings = {}
-          pRes.value.data.tasteProfile.favorites.forEach((item) => {
-            const id = Number(item.tmdbId || item.id)
-            if (id && item.rating) pRatings[id] = item.rating
-          })
-          setProfileRatings(pRatings)
+        if (pRes.status === 'fulfilled' && pRes.value.data?.tasteProfile) {
+          const tp = pRes.value.data.tasteProfile
+          if (tp.favorites) {
+            const pRatings = {}
+            tp.favorites.forEach((item) => {
+              const id = Number(item.tmdbId || item.id)
+              if (id && item.rating) pRatings[id] = item.rating
+            })
+            setProfileRatings(pRatings)
+          }
+          if (tp.selectedOrigins?.length > 0) {
+            setUserOrigins(tp.selectedOrigins)
+          }
         }
       } catch (e) {
         // silent fallback
@@ -546,7 +710,7 @@ function Recommendations() {
       const needsRefresh = localStorage.getItem('filmism_needs_refresh') === 'true'
       if (needsRefresh) {
         localStorage.removeItem('filmism_needs_refresh')
-        fetchRecommendations(1, false, true)  // force fresh matches post-login
+        fetchRecommendations(1, false, true)
       } else {
         fetchRecommendations(1, false)
       }
@@ -569,7 +733,6 @@ function Recommendations() {
       : [...watchlist, movieId]
 
     setWatchlist(newWatchlist)
-    // Remove immediately from active recommendations list
     setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
 
     try {
@@ -610,7 +773,6 @@ function Recommendations() {
       ...prev,
       [movieId]: outcomeRating,
     }))
-    // Remove immediately from recommendations list
     setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
     setActiveModalMovie(null)
 
@@ -621,7 +783,6 @@ function Recommendations() {
         outcomeRating,
         sourceClusterId: movie.sourceClusterId,
       })
-      // Refresh telemetry hit-rate
       const statsRes = await api.get('/recommendations/telemetry-stats', { params: { sessionId } })
       if (statsRes.data?.stats) {
         setTelemetry(statsRes.data.stats)
@@ -640,28 +801,89 @@ function Recommendations() {
     )
   })
 
-  // Filter options: guaranteed to include ALL active taste personas plus any extra cluster names
+  // Persona filter options
   const personaNames = (tasteClusters || []).map((c) => c.name).filter(Boolean)
-  const filterOptions = ['all', ...Array.from(new Set(personaNames))]
+  const personaFilterOptions = ['all', ...Array.from(new Set(personaNames))]
   activeRecs.forEach((r) => {
-    if (r.sourceClusterName && !filterOptions.includes(r.sourceClusterName)) {
-      filterOptions.push(r.sourceClusterName)
+    if (r.sourceClusterName && !personaFilterOptions.includes(r.sourceClusterName)) {
+      personaFilterOptions.push(r.sourceClusterName)
     }
   })
 
+  // User's chosen origins ONLY
+  const chosenOriginObjects = []
+  const seenOriginNames = new Set()
+
+  ;(userOrigins || []).forEach((o) => {
+    const info = getOriginInfo(o)
+    if (info && !seenOriginNames.has(info.name)) {
+      seenOriginNames.add(info.name)
+      chosenOriginObjects.push(info)
+    }
+  })
+
+  // Filter recommendations by Persona and User-Chosen Cinema Origin
   const filteredRecs = activeRecs.filter((r) => {
-    if (activeFilter === 'all') return true
-    return (
-      r.sourceClusterName === activeFilter ||
-      (Array.isArray(r.matchingClusters) && r.matchingClusters.includes(activeFilter)) ||
-      r.genre === activeFilter
-    )
+    // 1. Persona matching
+    let matchesPersona = true
+    if (activePersonaFilter !== 'all') {
+      matchesPersona =
+        r.sourceClusterName === activePersonaFilter ||
+        (Array.isArray(r.matchingClusters) && r.matchingClusters.includes(activePersonaFilter)) ||
+        r.genre === activePersonaFilter
+    }
+
+    // 2. User-chosen origin matching
+    let matchesOrigin = true
+    if (activeOriginFilter !== 'all') {
+      const targetCinema = getOriginInfo(activeOriginFilter)
+      const recOriginInfo = getOriginInfo(r.originCountries?.[0] || r.cinema)
+
+      if (targetCinema && recOriginInfo) {
+        if (targetCinema.id === recOriginInfo.id || targetCinema.name.toLowerCase() === recOriginInfo.name.toLowerCase()) {
+          matchesOrigin = true
+        } else if (targetCinema.countryCode && recOriginInfo.countryCode) {
+          const tc = targetCinema.countryCode.toUpperCase()
+          const rc = recOriginInfo.countryCode.toUpperCase()
+          if (tc === rc) {
+            matchesOrigin = true
+          } else if (tc === 'SE' && ['SE', 'NO', 'DK', 'FI', 'IS'].includes(rc)) {
+            matchesOrigin = true
+          } else if ((tc === 'GB' || tc === 'UK') && ['GB', 'UK'].includes(rc)) {
+            matchesOrigin = true
+          } else if ((tc === 'US' || tc === 'USA') && ['US', 'USA'].includes(rc)) {
+            matchesOrigin = true
+          } else {
+            matchesOrigin = false
+          }
+        } else if (
+          targetCinema.countryCode &&
+          Array.isArray(r.originCountries) &&
+          r.originCountries.map((c) => String(c).toUpperCase()).includes(targetCinema.countryCode.toUpperCase())
+        ) {
+          matchesOrigin = true
+        } else {
+          matchesOrigin = false
+        }
+      } else {
+        matchesOrigin = false
+      }
+    }
+
+    return matchesPersona && matchesOrigin
   })
 
   const allRatings = {
     ...(favoriteRatings || {}),
     ...profileRatings,
     ...watchedOutcomes,
+  }
+
+  const isAnyFilterActive = activePersonaFilter !== 'all' || activeOriginFilter !== 'all'
+
+  const handleResetFilters = () => {
+    setActivePersonaFilter('all')
+    setActiveOriginFilter('all')
   }
 
   return (
@@ -713,8 +935,8 @@ function Recommendations() {
                 {tasteClusters.map((c, i) => (
                   <ClusterTag
                     key={c.clusterId || i}
-                    $active={activeFilter === c.name}
-                    onClick={() => setActiveFilter(activeFilter === c.name ? 'all' : c.name)}
+                    $active={activePersonaFilter === c.name}
+                    onClick={() => setActivePersonaFilter(activePersonaFilter === c.name ? 'all' : c.name)}
                   >
                     {c.name}
                   </ClusterTag>
@@ -726,24 +948,87 @@ function Recommendations() {
           {/* Review Graph showing distribution of Not for me, Okay, Good, Great */}
           <ReviewGraph ratings={allRatings} />
 
-          {filterOptions.length > 1 && (
-            <FilterBar>
-              {filterOptions.map((f) => (
-                <FilterPill
-                  key={f}
-                  $active={activeFilter === f}
-                  onClick={() => setActiveFilter(f)}
-                >
-                  {f}
-                </FilterPill>
-              ))}
-            </FilterBar>
-          )}
+          {/* Filter Controls: Taste Personas & User-Chosen Origins Only */}
+          <FilterContainer>
+            {personaFilterOptions.length > 1 && (
+              <FilterRow>
+                <FilterLabel>Personas</FilterLabel>
+                <FilterPillsList>
+                  {personaFilterOptions.map((f) => (
+                    <FilterPill
+                      key={f}
+                      $active={activePersonaFilter === f}
+                      onClick={() => setActivePersonaFilter(f)}
+                    >
+                      {f === 'all' ? '✦ All Personas' : f}
+                    </FilterPill>
+                  ))}
+                </FilterPillsList>
+                {isAnyFilterActive && (
+                  <ResetFiltersBtn onClick={handleResetFilters}>
+                    Reset filters ✕
+                  </ResetFiltersBtn>
+                )}
+              </FilterRow>
+            )}
+
+            {chosenOriginObjects.length > 0 && (
+              <FilterRow>
+                <FilterLabel>Your Origins</FilterLabel>
+                <FilterPillsList>
+                  <OriginFilterPill
+                    $active={activeOriginFilter === 'all'}
+                    onClick={() => setActiveOriginFilter('all')}
+                  >
+                    All Chosen Origins
+                  </OriginFilterPill>
+                  {chosenOriginObjects.map((origin) => {
+                    const isActive = activeOriginFilter === origin.name
+                    return (
+                      <OriginFilterPill
+                        key={origin.id || origin.name}
+                        $active={isActive}
+                        $accent={origin.accent}
+                        $tint={origin.tint}
+                        $activeBg={origin.activeBg}
+                        onClick={() => setActiveOriginFilter(isActive ? 'all' : origin.name)}
+                      >
+                        <span>{origin.name}</span>
+                      </OriginFilterPill>
+                    )
+                  })}
+                </FilterPillsList>
+              </FilterRow>
+            )}
+          </FilterContainer>
 
           {loading ? (
             <EmptyState>Loading personalized recommendations...</EmptyState>
           ) : filteredRecs.length === 0 ? (
-            <EmptyState>No recommendations found matching filter.</EmptyState>
+            <EmptyState>
+              <p style={{ margin: '0 0 1rem', fontSize: '1rem', color: '#444', fontWeight: 600 }}>
+                No recommendations found matching
+                {activeOriginFilter !== 'all' ? ` origin "${activeOriginFilter}"` : ''}
+                {activePersonaFilter !== 'all' ? ` in persona "${activePersonaFilter}"` : ''}.
+              </p>
+              <p style={{ margin: '0 0 1.25rem', fontSize: '0.8rem', color: '#888' }}>
+                Try selecting "All Chosen Origins" or loading more films from your candidate pool.
+              </p>
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                <RefineBtn onClick={handleResetFilters}>
+                  Clear Active Filters
+                </RefineBtn>
+                {hasMore && (
+                  <RefineBtn
+                    style={{ background: '#ff751f', borderColor: '#ff751f', color: '#fff' }}
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? 'Finding more films...' : 'Load More Recommendations ↓'}
+                  </RefineBtn>
+                )}
+              </div>
+            </EmptyState>
           ) : (
             <>
               <RecList>
@@ -751,6 +1036,8 @@ function Recommendations() {
                   const isWatchlisted = watchlist.includes(rec.id)
                   const outcomeRating = watchedOutcomes[rec.id]
                   const isWatched = outcomeRating !== undefined
+
+                  const cinemaInfo = getOriginInfo(rec.cinema || rec.originCountries?.[0])
 
                   return (
                     <RecCard key={rec.id} id={`rec-${rec.id}`}>
@@ -765,6 +1052,11 @@ function Recommendations() {
                           <RecTopRow>
                             <RecTitle>{rec.title}</RecTitle>
                             <MatchPill>{rec.match}% Match</MatchPill>
+                            {cinemaInfo && (
+                              <OriginBadge $accent={cinemaInfo.accent} $tint={cinemaInfo.tint}>
+                                {cinemaInfo.name}
+                              </OriginBadge>
+                            )}
                           </RecTopRow>
 
                           {rec.sourceClusterName && (
@@ -814,7 +1106,7 @@ function Recommendations() {
                 })}
               </RecList>
 
-              {activeFilter === 'all' && (
+              {activePersonaFilter === 'all' && activeOriginFilter === 'all' && (
                 <LoadMoreWrapper>
                   {hasMore ? (
                     <LoadMoreBtn onClick={handleLoadMore} disabled={loadingMore}>

@@ -3,15 +3,23 @@ import styled, { keyframes } from 'styled-components'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import UserAvatar from '../components/UserAvatar'
+import { useTasteProfile } from '../hooks/useTasteProfile'
 
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w342'
 
+const RATING_TIERS = [
+  { value: 4, label: 'great',       symbol: '♥', desc: 'Masterpiece / Loved it',         color: '#2e7d32', bg: 'rgba(46,125,50,0.1)'   },
+  { value: 3, label: 'good',        symbol: '★', desc: 'Solid film / Enjoyed it',        color: '#ff751f', bg: 'rgba(255,117,31,0.1)'  },
+  { value: 2, label: 'okay',        symbol: '—', desc: 'Decent / Mixed feelings',        color: '#888',    bg: 'rgba(0,0,0,0.06)'      },
+  { value: 1, label: 'not for me',  symbol: '✕', desc: 'Disliked / Didn\'t connect',      color: '#c0392b', bg: 'rgba(192,57,43,0.08)' },
+]
+
 const RATING_CONFIG = {
-  'great':       { label: 'great',       color: '#2e7d32', bg: 'rgba(46,125,50,0.1)'   },
-  'good':        { label: 'good',        color: '#ff751f', bg: 'rgba(255,117,31,0.1)'  },
-  'okay':        { label: 'okay',        color: '#888',    bg: 'rgba(0,0,0,0.06)'      },
-  'not for me':  { label: 'not for me',  color: '#c0392b', bg: 'rgba(192,57,43,0.08)' },
-  'none':        { label: 'unrated',     color: '#bbb',    bg: 'rgba(0,0,0,0.04)'      },
+  'great':       { label: 'great',       symbol: '♥', color: '#2e7d32', bg: 'rgba(46,125,50,0.1)'   },
+  'good':        { label: 'good',        symbol: '★', color: '#ff751f', bg: 'rgba(255,117,31,0.1)'  },
+  'okay':        { label: 'okay',        symbol: '—', color: '#888',    bg: 'rgba(0,0,0,0.06)'      },
+  'not for me':  { label: 'not for me',  symbol: '✕', color: '#c0392b', bg: 'rgba(192,57,43,0.08)' },
+  'none':        { label: 'unrated',     symbol: '○', color: '#bbb',    bg: 'rgba(0,0,0,0.04)'      },
 }
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
@@ -60,7 +68,21 @@ const EmptyLink = styled(Link)`
   border-radius: 6px; text-decoration: none; transition: background 0.2s;
   &:hover { background: #e6600c; }
 `
-const fadeIn = keyframes`from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}`
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
+`
+const scaleIn = keyframes`
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+`
+
 const Grid = styled.div`
   display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.1rem;
   @media (max-width: 480px) { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
@@ -70,6 +92,7 @@ const Card = styled.div`
   transition: transform 0.2s, box-shadow 0.2s;
   animation: ${fadeIn} 0.3s ease both; animation-delay: ${({ $i }) => $i * 0.03}s;
   display: flex; flex-direction: column;
+  position: relative;
   &:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
 `
 const PosterWrap = styled.div`
@@ -80,27 +103,44 @@ const PosterFallback = styled.div`
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
   font-family: 'Lexend Deca', sans-serif; font-size: 0.7rem; color: #aaa; text-align: center; padding: 0.5rem;
 `
-const ReviewPill = styled.div`
-  display: inline-block;
-  padding: 2px 8px;
+
+const ReviewPillBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.62rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: lowercase;
   letter-spacing: 0.03em;
   color: ${({ $color }) => $color};
   background: ${({ $bg }) => $bg};
-  border: 1px solid ${({ $color }) => $color}33;
+  border: 1.5px solid ${({ $color }) => $color}44;
   margin-top: auto;
-  align-self: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+
+  &:hover {
+    border-color: ${({ $color }) => $color};
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+  }
+
+  span.edit-icon {
+    font-size: 0.65rem;
+    opacity: 0.7;
+  }
 `
+
 const CardBody = styled.div`
-  padding: 0.6rem 0.7rem 0.7rem;
+  padding: 0.65rem 0.75rem 0.8rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
   flex: 1;
   text-align: center;
 `
@@ -124,11 +164,264 @@ const CardYear = styled.p`
   letter-spacing: 0.02em;
 `
 
+const FilterTabs = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+`
+
+const FilterBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  font-weight: ${({ $active }) => ($active ? '700' : '500')};
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 1.5px solid ${({ $active }) => ($active ? '#ff751f' : '#ddd')};
+  background: ${({ $active }) => ($active ? '#ff751f' : '#fff')};
+  color: ${({ $active }) => ($active ? '#fff' : '#555')};
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: lowercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  &:hover {
+    border-color: #ff751f;
+    color: ${({ $active }) => ($active ? '#fff' : '#ff751f')};
+  }
+
+  span.count {
+    opacity: 0.75;
+    font-size: 0.72rem;
+  }
+`
+
+const FavoriteBadge = styled.div`
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(17, 17, 17, 0.85);
+  backdrop-filter: blur(4px);
+  color: #ffb800;
+  border: 1px solid rgba(255, 184, 0, 0.4);
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 2;
+`
+
+// ─── Clean Rating Modal ────────────────────────────────────────────────────────
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  animation: ${fadeIn} 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+`
+
+const ModalCard = styled.div`
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 1.5rem;
+  max-width: 440px;
+  width: 100%;
+  color: #fff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  position: relative;
+  animation: ${scaleIn} 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+`
+
+const ModalCloseBtn = styled.button`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #aaa;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+  }
+`
+
+const FilmHeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding-right: 2rem;
+`
+
+const ModalPoster = styled.img`
+  width: 52px;
+  height: 78px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #27272a;
+`
+
+const ModalFilmInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+`
+
+const ModalFilmTitle = styled.h2`
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: 1rem;
+  color: #fff;
+  margin: 0;
+  line-height: 1.2;
+`
+
+const ModalFilmSub = styled.p`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  margin: 0;
+`
+
+const ModalInstruction = styled.p`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.8rem;
+  color: #d4d4d8;
+  margin: 0 0 1rem;
+  line-height: 1.4;
+`
+
+const TierList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+`
+
+const TierCardBtn = styled.button`
+  background: ${({ $active }) => ($active ? 'rgba(255, 117, 31, 0.15)' : 'rgba(255, 255, 255, 0.04)')};
+  border: 1.5px solid ${({ $active, $color }) => ($active ? '#ff751f' : 'rgba(255, 255, 255, 0.08)')};
+  border-radius: 10px;
+  padding: 0.75rem 0.95rem;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+
+  &:hover {
+    border-color: ${({ $color }) => $color};
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const TierLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`
+
+const TierIconBox = styled.div`
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: ${({ $bg }) => $bg};
+  color: ${({ $color }) => $color};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+`
+
+const TierTextCol = styled.div`
+  display: flex;
+  flex-direction: column;
+`
+
+const TierName = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: #fff;
+`
+
+const TierDesc = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  color: #a1a1aa;
+`
+
+const ToastBanner = styled.div`
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #fff;
+  padding: 0.75rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 117, 31, 0.4);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  z-index: 120;
+  animation: ${fadeIn} 0.2s ease-out;
+
+  span.icon {
+    color: #ff751f;
+    font-weight: 700;
+  }
+`
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function Diary() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all') // 'all' | 'favorites' | 'watched'
+  const [editingFilm, setEditingFilm] = useState(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+
+  const { setTasteClusters, setAiSynthesis } = useTasteProfile()
 
   useEffect(() => {
     const sessionId = localStorage.getItem('filmism_session_id') || undefined
@@ -138,10 +431,61 @@ function Diary() {
       .finally(() => setLoading(false))
   }, [])
 
-  const formatDate = (iso) => {
-    if (!iso) return ''
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const handleRatingChange = async (tier) => {
+    if (!editingFilm) return
+    setIsUpdating(true)
+    const sessionId = localStorage.getItem('filmism_session_id') || undefined
+
+    try {
+      const response = await api.put('/taste-profile/favorite-rating', {
+        tmdbId: editingFilm.tmdbId,
+        rating: tier.value,
+        title: editingFilm.title,
+        sessionId,
+      })
+
+      if (response.data?.success) {
+        // Update item in local list
+        setItems((prev) =>
+          prev.map((item) =>
+            item.tmdbId === editingFilm.tmdbId
+              ? { ...item, outcomeRating: tier.value, outcomeLabel: tier.label }
+              : item
+          )
+        )
+
+        // Sync recalculated taste clusters to context & storage
+        if (response.data.clusters) {
+          setTasteClusters(response.data.clusters)
+          localStorage.setItem('filmism_taste_clusters', JSON.stringify(response.data.clusters))
+        }
+        if (response.data.aiSynthesis) {
+          setAiSynthesis(response.data.aiSynthesis)
+          localStorage.setItem('filmism_ai_synthesis', response.data.aiSynthesis)
+        }
+
+        localStorage.setItem('filmism_needs_refresh', 'true')
+        setToastMessage(`Updated rating for "${editingFilm.title}" & re-calibrated taste clusters!`)
+        setTimeout(() => setToastMessage(''), 4000)
+      }
+    } catch (err) {
+      console.error('Failed to update film rating:', err)
+      setToastMessage('Failed to update rating. Please try again.')
+      setTimeout(() => setToastMessage(''), 3000)
+    } finally {
+      setIsUpdating(false)
+      setEditingFilm(null)
+    }
   }
+
+  const favoritesCount = items.filter((f) => f.isFavorite).length
+  const watchedCount = items.filter((f) => f.source === 'watched').length
+
+  const filteredItems = items.filter((film) => {
+    if (filter === 'favorites') return film.isFavorite
+    if (filter === 'watched') return film.source === 'watched'
+    return true
+  })
 
   return (
     <PageWrapper>
@@ -155,10 +499,24 @@ function Diary() {
             <PageTitle>film logs</PageTitle>
             {!loading && (
               <PageCount>
-                {items.length === 0 ? 'no films logged yet' : `${items.length} film${items.length !== 1 ? 's' : ''} logged`}
+                {items.length === 0 ? 'no films logged yet' : `${items.length} total film${items.length !== 1 ? 's' : ''} in your cinema history`}
               </PageCount>
             )}
           </div>
+
+          {!loading && items.length > 0 && (
+            <FilterTabs>
+              <FilterBtn $active={filter === 'all'} onClick={() => setFilter('all')}>
+                all <span className="count">({items.length})</span>
+              </FilterBtn>
+              <FilterBtn $active={filter === 'favorites'} onClick={() => setFilter('favorites')}>
+                ★ favorites <span className="count">({favoritesCount})</span>
+              </FilterBtn>
+              <FilterBtn $active={filter === 'watched'} onClick={() => setFilter('watched')}>
+                watched <span className="count">({watchedCount})</span>
+              </FilterBtn>
+            </FilterTabs>
+          )}
         </PageHeader>
 
         {loading ? (
@@ -166,16 +524,26 @@ function Diary() {
         ) : items.length === 0 ? (
           <EmptyState>
             <EmptyTitle>no films logged yet.</EmptyTitle>
-            <EmptySub>Mark films as watched from your recommendations to log them here.</EmptySub>
-            <EmptyLink to="/recommend">browse recommendations →</EmptyLink>
+            <EmptySub>Build your taste profile or mark films as watched to see your cinema log here.</EmptySub>
+            <EmptyLink to="/taste">build taste profile →</EmptyLink>
+          </EmptyState>
+        ) : filteredItems.length === 0 ? (
+          <EmptyState>
+            <EmptyTitle>no {filter} found.</EmptyTitle>
+            <EmptySub>You don't have any films under this filter category yet.</EmptySub>
+            <EmptyLink as="button" onClick={() => setFilter('all')}>view all logged films</EmptyLink>
           </EmptyState>
         ) : (
           <Grid>
-            {items.map((film, i) => {
+            {filteredItems.map((film, i) => {
               const rc = RATING_CONFIG[film.outcomeLabel] || RATING_CONFIG['none']
+
               return (
-                <Card key={`${film.tmdbId}-${i}`} $i={i}>
+                <Card key={`${film.tmdbId}-${film.source || ''}-${i}`} $i={i}>
                   <PosterWrap>
+                    {film.isFavorite && (
+                      <FavoriteBadge>★ favorite</FavoriteBadge>
+                    )}
                     {film.poster_path
                       ? <Poster src={`${TMDB_IMG}${film.poster_path}`} alt={film.title} loading="lazy" />
                       : <PosterFallback>{film.title}</PosterFallback>
@@ -184,14 +552,81 @@ function Diary() {
                   <CardBody>
                     <CardTitle>{film.title}</CardTitle>
                     {film.year && <CardYear>{film.year}</CardYear>}
-                    <ReviewPill $color={rc.color} $bg={rc.bg} style={{ marginTop: 'auto' }}>
-                      {rc.label}
-                    </ReviewPill>
+
+                    <ReviewPillBtn
+                      type="button"
+                      $color={rc.color}
+                      $bg={rc.bg}
+                      onClick={() => setEditingFilm(film)}
+                      title="Click to edit rating & re-tune taste profile"
+                    >
+                      <span>{rc.symbol} {rc.label}</span>
+                      <span className="edit-icon">✎</span>
+                    </ReviewPillBtn>
                   </CardBody>
                 </Card>
               )
             })}
           </Grid>
+        )}
+
+        {/* ── Sleek Rating Edit Modal ── */}
+        {editingFilm && (
+          <ModalOverlay onClick={() => !isUpdating && setEditingFilm(null)}>
+            <ModalCard onClick={(e) => e.stopPropagation()}>
+              <ModalCloseBtn onClick={() => !isUpdating && setEditingFilm(null)} aria-label="Close">
+                ✕
+              </ModalCloseBtn>
+
+              <FilmHeaderRow>
+                {editingFilm.poster_path ? (
+                  <ModalPoster src={`${TMDB_IMG}${editingFilm.poster_path}`} alt={editingFilm.title} />
+                ) : null}
+                <ModalFilmInfo>
+                  <ModalFilmTitle>{editingFilm.title}</ModalFilmTitle>
+                  <ModalFilmSub>{editingFilm.year || 'Film Log'}</ModalFilmSub>
+                </ModalFilmInfo>
+              </FilmHeaderRow>
+
+              <ModalInstruction>
+                Select your rating verdict below. Your taste clusters and recommendation weights will automatically recalibrate in real time:
+              </ModalInstruction>
+
+              <TierList>
+                {RATING_TIERS.map((tier) => {
+                  const isActive = editingFilm.outcomeLabel === tier.label
+                  return (
+                    <TierCardBtn
+                      key={tier.value}
+                      type="button"
+                      $active={isActive}
+                      $color={tier.color}
+                      disabled={isUpdating}
+                      onClick={() => handleRatingChange(tier)}
+                    >
+                      <TierLeft>
+                        <TierIconBox $color={tier.color} $bg={tier.bg}>
+                          {tier.symbol}
+                        </TierIconBox>
+                        <TierTextCol>
+                          <TierName>{tier.label}</TierName>
+                          <TierDesc>{tier.desc}</TierDesc>
+                        </TierTextCol>
+                      </TierLeft>
+                      {isActive && <span style={{ color: '#ff751f', fontSize: '0.85rem' }}>✓ Current</span>}
+                    </TierCardBtn>
+                  )
+                })}
+              </TierList>
+            </ModalCard>
+          </ModalOverlay>
+        )}
+
+        {toastMessage && (
+          <ToastBanner>
+            <span className="icon">✦</span>
+            <span>{toastMessage}</span>
+          </ToastBanner>
         )}
       </PageBody>
     </PageWrapper>

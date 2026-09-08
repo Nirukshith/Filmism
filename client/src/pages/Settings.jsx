@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
-import api from '../services/api'
+import api, { matchingAPI } from '../services/api'
 import { getAuthStatus } from '../utils/auth'
 import { useTasteProfile } from '../hooks/useTasteProfile'
 import UserAvatar from '../components/UserAvatar'
@@ -65,6 +65,15 @@ const SettingsGearIcon = ({ size = 22 }) => (
   >
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+)
+
+const TwinIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 )
 
@@ -488,6 +497,54 @@ const DataValue = styled.span`
   color: #111;
 `
 
+// Toggle Components
+const ToggleContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+
+  @media (max-width: 600px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+`
+
+const ToggleSwitch = styled.label`
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: pointer;
+`
+
+const ToggleSlider = styled.span`
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: ${({ $checked }) => ($checked ? '#ff751f' : '#d1d5db')};
+  transition: 0.25s ease;
+  border-radius: 26px;
+
+  &:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transform: ${({ $checked }) => ($checked ? 'translateX(22px)' : 'translateX(0)')};
+  }
+`
+
 // Quick Actions
 const QuickActionsCard = styled(Card)`
   display: flex;
@@ -590,6 +647,51 @@ const Input = styled.input`
     box-shadow: 0 0 0 3px rgba(255, 117, 31, 0.12);
   }
 `
+
+const PasswordInputWrap = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+`
+
+const PasswordInput = styled(Input)`
+  padding-right: 2.5rem;
+`
+
+const ShowPasswordBtn = styled.button`
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.35rem 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #111827;
+  }
+`
+
+const EyeIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const EyeOffIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+)
 
 const FormActionsRow = styled.div`
   display: flex;
@@ -773,33 +875,70 @@ function Settings() {
   // Password state
   const [pwd, setPwd] = useState({ current: '', new: '', confirm: '' })
   const [pwdStatus, setPwdStatus] = useState({ loading: false, error: '', success: '' })
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false)
+  const [showNewPwd, setShowNewPwd] = useState(false)
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false)
 
   // Reset & stats state
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetStatus, setResetStatus] = useState({ loading: false, error: '', success: '' })
   const [cinemaStats, setCinemaStats] = useState({ watchlistCount: 0, diaryCount: 0 })
 
+  // Cinephile Twin matching state
+  const [matchingEnabled, setMatchingEnabled] = useState(false)
+  const [matchingStatus, setMatchingStatus] = useState({ loading: false, error: '', success: '' })
+
   const activePersonasCount = tasteClusters?.length || 0
   const fullName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || 'Film Enthusiast'
   const initials = ((currentUser?.firstName?.[0] || '') + (currentUser?.lastName?.[0] || '')).toUpperCase() || 'FP'
   const userIdentifier = `FILM-${(currentUser?._id || '0000').slice(-4).toUpperCase()}`
 
-  // Fetch summary stats for display
+  // Fetch summary stats & matching status for display
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const sessionId = localStorage.getItem('filmism_session_id') || undefined
-        const [wRes, dRes] = await Promise.allSettled([
+        const [wRes, dRes, matchRes] = await Promise.allSettled([
           api.get('/recommendations/watchlist', { params: { sessionId } }),
           api.get('/recommendations/diary', { params: { sessionId } }),
+          matchingAPI.getCurrentMatch(),
         ])
         const watchlistCount = wRes.status === 'fulfilled' ? (wRes.value.data?.watchlist?.length || 0) : 0
         const diaryCount = dRes.status === 'fulfilled' ? (dRes.value.data?.diary?.length || 0) : 0
         setCinemaStats((prev) => ({ ...prev, watchlistCount, diaryCount }))
+
+        if (matchRes.status === 'fulfilled' && matchRes.value.data?.matchingEnabled !== undefined) {
+          setMatchingEnabled(Boolean(matchRes.value.data.matchingEnabled))
+        }
       } catch (e) { }
     }
     fetchStats()
   }, [])
+
+  const handleToggleMatching = async () => {
+    const nextVal = !matchingEnabled
+    setMatchingStatus({ loading: true, error: '', success: '' })
+    try {
+      const res = await matchingAPI.toggleOptIn(nextVal)
+      setMatchingEnabled(Boolean(res.data?.matchingEnabled))
+      setMatchingStatus({
+        loading: false,
+        error: '',
+        success: res.data?.matchingEnabled
+          ? 'Cinephile Twin matching enabled!'
+          : 'Cinephile Twin matching disabled.',
+      })
+      setTimeout(() => {
+        setMatchingStatus((prev) => ({ ...prev, success: '' }))
+      }, 4000)
+    } catch (err) {
+      setMatchingStatus({
+        loading: false,
+        error: err.response?.data?.message || 'Failed to update matching preference.',
+        success: '',
+      })
+    }
+  }
 
   // ── Avatar Upload Handlers ──
   const handleAvatarClick = () => {
@@ -1141,6 +1280,77 @@ function Settings() {
                   </Card>
                 </InfoGrid>
 
+                {/* Cinephile Twin Matching Section */}
+                <Card style={{ marginTop: '1.25rem' }}>
+                  <CardHeader>
+                    <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <TwinIcon size={14} /> Cinephile Twin Matching
+                    </CardTitle>
+                    {matchingEnabled ? (
+                      <HeroBadge $accent={true}>● Opted In</HeroBadge>
+                    ) : (
+                      <HeroBadge>Off</HeroBadge>
+                    )}
+                  </CardHeader>
+                  <ToggleContainer>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <span style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.92rem', fontWeight: 600, color: '#111' }}>
+                        Let other cinephiles with similar taste find you
+                      </span>
+                      <p style={{ margin: 0, fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.78rem', color: '#666', lineHeight: 1.45 }}>
+                        When enabled, our vector matching engine pairs you with cinephiles who share your aesthetic personas and film favorites. Only your first name, avatar, and taste overlap are visible to your matches. Your email and private watch data are never shared.
+                      </p>
+                    </div>
+                    <ToggleSwitch>
+                      <input
+                        type="checkbox"
+                        id="cinephile-twin-toggle"
+                        checked={matchingEnabled}
+                        onChange={handleToggleMatching}
+                        disabled={matchingStatus.loading}
+                        style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                      />
+                      <ToggleSlider $checked={matchingEnabled} onClick={handleToggleMatching} />
+                    </ToggleSwitch>
+                  </ToggleContainer>
+
+                  {matchingStatus.loading && (
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#ff751f', fontFamily: 'Lexend Deca, sans-serif' }}>
+                      Updating preference...
+                    </div>
+                  )}
+                  {matchingStatus.success && (
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#10b981', fontFamily: 'Lexend Deca, sans-serif' }}>
+                      {matchingStatus.success}
+                    </div>
+                  )}
+                  {matchingStatus.error && (
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#dc2626', fontFamily: 'Lexend Deca, sans-serif' }}>
+                      {matchingStatus.error}
+                    </div>
+                  )}
+
+                  {matchingEnabled && (
+                    <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #f0f0f0' }}>
+                      <Link
+                        to="/twin"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          fontFamily: 'Lexend Deca, sans-serif',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          color: '#ff751f',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <TwinIcon size={14} /> Meet Your Cinephile Twin →
+                      </Link>
+                    </div>
+                  )}
+                </Card>
+
                 {/* Quick Actions */}
                 {!isEditingProfile && (
                   <PrimaryEditBtn onClick={() => {
@@ -1250,33 +1460,60 @@ function Settings() {
                 </CardHeader>
                 <Field>
                   <Label htmlFor="currentPwd">current password</Label>
-                  <Input
-                    id="currentPwd"
-                    type="password"
-                    value={pwd.current}
-                    onChange={(e) => setPwd((p) => ({ ...p, current: e.target.value }))}
-                    placeholder="Your current password"
-                  />
+                  <PasswordInputWrap>
+                    <PasswordInput
+                      id="currentPwd"
+                      type={showCurrentPwd ? 'text' : 'password'}
+                      value={pwd.current}
+                      onChange={(e) => setPwd((p) => ({ ...p, current: e.target.value }))}
+                      placeholder="Your current password"
+                    />
+                    <ShowPasswordBtn
+                      type="button"
+                      onClick={() => setShowCurrentPwd((prev) => !prev)}
+                      aria-label={showCurrentPwd ? 'Hide current password' : 'Show current password'}
+                    >
+                      {showCurrentPwd ? <EyeOffIcon /> : <EyeIcon />}
+                    </ShowPasswordBtn>
+                  </PasswordInputWrap>
                 </Field>
                 <Field>
                   <Label htmlFor="newPwd">new password</Label>
-                  <Input
-                    id="newPwd"
-                    type="password"
-                    value={pwd.new}
-                    onChange={(e) => setPwd((p) => ({ ...p, new: e.target.value }))}
-                    placeholder="Min. 8 chars, 1 uppercase, 1 special char"
-                  />
+                  <PasswordInputWrap>
+                    <PasswordInput
+                      id="newPwd"
+                      type={showNewPwd ? 'text' : 'password'}
+                      value={pwd.new}
+                      onChange={(e) => setPwd((p) => ({ ...p, new: e.target.value }))}
+                      placeholder="Min. 8 chars, 1 uppercase, 1 special char"
+                    />
+                    <ShowPasswordBtn
+                      type="button"
+                      onClick={() => setShowNewPwd((prev) => !prev)}
+                      aria-label={showNewPwd ? 'Hide new password' : 'Show new password'}
+                    >
+                      {showNewPwd ? <EyeOffIcon /> : <EyeIcon />}
+                    </ShowPasswordBtn>
+                  </PasswordInputWrap>
                 </Field>
                 <Field>
                   <Label htmlFor="confirmPwd">confirm new password</Label>
-                  <Input
-                    id="confirmPwd"
-                    type="password"
-                    value={pwd.confirm}
-                    onChange={(e) => setPwd((p) => ({ ...p, confirm: e.target.value }))}
-                    placeholder="Repeat new password"
-                  />
+                  <PasswordInputWrap>
+                    <PasswordInput
+                      id="confirmPwd"
+                      type={showConfirmPwd ? 'text' : 'password'}
+                      value={pwd.confirm}
+                      onChange={(e) => setPwd((p) => ({ ...p, confirm: e.target.value }))}
+                      placeholder="Repeat new password"
+                    />
+                    <ShowPasswordBtn
+                      type="button"
+                      onClick={() => setShowConfirmPwd((prev) => !prev)}
+                      aria-label={showConfirmPwd ? 'Hide confirm password' : 'Show confirm password'}
+                    >
+                      {showConfirmPwd ? <EyeOffIcon /> : <EyeIcon />}
+                    </ShowPasswordBtn>
+                  </PasswordInputWrap>
                 </Field>
                 {pwdStatus.error && <ErrorText>{pwdStatus.error}</ErrorText>}
                 {pwdStatus.success && <SuccessText>{pwdStatus.success}</SuccessText>}

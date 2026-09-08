@@ -81,7 +81,7 @@ async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 12)
         });
       }
     });
-  } catch (e) {}
+  } catch (e) { }
 
   // 3. Query existing MongoDB profiled movies closest to this cluster's centroid
   if (cluster.centroidEmbedding?.length > 0) {
@@ -108,7 +108,7 @@ async function fetchCandidatesForCluster(cluster, userProfile, targetCount = 12)
           }
         });
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const selectedCandidateIds = Array.from(candidateIdSet).slice(0, targetCount * 2);

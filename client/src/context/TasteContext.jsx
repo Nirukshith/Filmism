@@ -28,30 +28,65 @@ export function TasteProvider({ children }) {
   }, [sessionId])
 
   // Load initial profile data from logged-in user or session if saved in localStorage
-  useEffect(() => {
+  const reloadFromStorage = () => {
     const storedUser = localStorage.getItem('user')
+    const pendingOnboarding = localStorage.getItem('filmism_pending_onboarding')
+
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser)
-        if (user.selectedGenres)  setSelectedGenres(user.selectedGenres)
-        if (user.selectedCinemas) setSelectedCinemas(user.selectedCinemas)
-        if (user.selectedPosters) setSelectedFilms(user.selectedPosters)
-        if (user.aestheticProfile) setAestheticProfile(user.aestheticProfile)
+        if (!user.tasteProfileComplete && !pendingOnboarding) {
+          // Fresh user: reset all onboarding selections to clean initial state
+          setSelectedGenres([])
+          setSelectedCinemas([])
+          setSelectedFilms([])
+          setFavoriteRatings({})
+          setTasteClusters([])
+          setAiSynthesis('')
+          setUserTasteProfile(null)
+          setAestheticProfile(null)
+        } else {
+          // Existing profile or user with completed taste profile
+          setSelectedGenres(Array.isArray(user.selectedGenres) ? user.selectedGenres : [])
+          setSelectedCinemas(Array.isArray(user.selectedCinemas) ? user.selectedCinemas : [])
+          setSelectedFilms(Array.isArray(user.selectedPosters) ? user.selectedPosters : [])
+          if (user.aestheticProfile) setAestheticProfile(user.aestheticProfile)
+        }
       } catch (err) {
         console.error('Error parsing stored user data:', err)
       }
+    } else {
+      // Guest or logged-out state
+      const storedClusters = localStorage.getItem('filmism_taste_clusters')
+      if (storedClusters) {
+        try {
+          setTasteClusters(JSON.parse(storedClusters))
+        } catch (e) {}
+      } else {
+        setTasteClusters([])
+      }
+
+      const storedSynthesis = localStorage.getItem('filmism_ai_synthesis')
+      if (storedSynthesis) {
+        setAiSynthesis(storedSynthesis)
+      } else {
+        setAiSynthesis('')
+      }
+    }
+  }
+
+  useEffect(() => {
+    reloadFromStorage()
+
+    const handleAuthChange = () => {
+      reloadFromStorage()
     }
 
-    const storedClusters = localStorage.getItem('filmism_taste_clusters')
-    if (storedClusters) {
-      try {
-        setTasteClusters(JSON.parse(storedClusters))
-      } catch (e) {}
-    }
-
-    const storedSynthesis = localStorage.getItem('filmism_ai_synthesis')
-    if (storedSynthesis) {
-      setAiSynthesis(storedSynthesis)
+    window.addEventListener('storage', handleAuthChange)
+    window.addEventListener('filmism_auth_update', handleAuthChange)
+    return () => {
+      window.removeEventListener('storage', handleAuthChange)
+      window.removeEventListener('filmism_auth_update', handleAuthChange)
     }
   }, [])
 

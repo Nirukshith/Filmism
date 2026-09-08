@@ -8,12 +8,27 @@ const OpenAI = require('openai');
 const GEMINI_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
 const OPENAI_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const OPENROUTER_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
+const DEEPSEEK_KEY = (process.env.DEEPSEEK_API_KEY || '').trim();
 
 const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS, 10) || 10000;
 
 let geminiClient = null;
 let openaiClient = null;
 let openrouterClient = null;
+let deepseekClient = null;
+
+if (DEEPSEEK_KEY) {
+  try {
+    deepseekClient = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: DEEPSEEK_KEY,
+      timeout: AI_TIMEOUT_MS,
+      maxRetries: 2,
+    });
+  } catch (err) {
+    console.warn('DeepSeek client init warning:', err.message);
+  }
+}
 
 if (OPENROUTER_KEY) {
   try {
@@ -387,6 +402,39 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
   ],
   "overallTasteSynthesis": "1-2 sentences synthesizing the overall spectrum of the user's cinema taste."
 }`;
+
+  if (deepseekClient) {
+    try {
+      const modelName = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+      const completion = await executeWithTimeout(
+        () =>
+          retryWithBackoff(
+            () =>
+              deepseekClient.chat.completions.create({
+                model: modelName,
+                max_tokens: 1200,
+                messages: [
+                  { role: 'system', content: 'You are an expert film analyst providing structured taste clustering.' },
+                  { role: 'user', content: prompt },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+              }),
+            1,
+            500,
+            'DeepSeek Taste Clustering'
+          ),
+        AI_TIMEOUT_MS,
+        'DeepSeek Taste Clustering'
+      );
+      const parsed = JSON.parse(completion.choices[0].message.content.trim());
+      if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
+        return parsed;
+      }
+    } catch (err) {
+      console.warn('DeepSeek clustering warning:', err.message);
+    }
+  }
 
   if (openrouterClient) {
     try {

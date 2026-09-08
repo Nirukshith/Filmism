@@ -45,6 +45,15 @@ const LogoutIcon = ({ size = 14 }) => (
   </svg>
 )
 
+const TwinIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
 const fadeSlide = keyframes`
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -225,6 +234,9 @@ function UserAvatar() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('filmism_is_returning_user')
+    localStorage.removeItem('filmism_taste_clusters')
+    localStorage.removeItem('filmism_ai_synthesis')
+    localStorage.removeItem('filmism_pending_onboarding')
     window.dispatchEvent(new Event('filmism_auth_update'))
     navigate('/')
   }
@@ -262,6 +274,10 @@ function UserAvatar() {
             <DropItem to="/diary" onClick={() => setOpen(false)} role="menuitem">
               <span className="icon"><DiaryIcon size={14} /></span>
               film logs
+            </DropItem>
+            <DropItem to="/twin" onClick={() => setOpen(false)} role="menuitem">
+              <span className="icon"><TwinIcon size={14} /></span>
+              cinephile twin
             </DropItem>
             <DropItem to="/settings" onClick={() => setOpen(false)} role="menuitem">
               <span className="icon"><SettingsIcon size={14} /></span>

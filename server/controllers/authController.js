@@ -1,5 +1,6 @@
 const User = require('../models/userModel')
 const UserTasteProfile = require('../models/userTasteProfileModel')
+const Match = require('../models/matchModel')
 const jwt  = require('jsonwebtoken')
 const bcrypt = require('bcryptjs') 
 const sendOtpEmail = require('../utils/sendEmail')
@@ -473,8 +474,11 @@ const resetTasteProfile = async (req, res, next) => {
     user.aestheticProfile = undefined
     await user.save()
 
-    // Clear user's calculated taste clusters and cached recommendations
-    await UserTasteProfile.deleteMany({ userId: user._id })
+    // Clear user's calculated taste clusters, cached recommendations, and match history
+    await Promise.all([
+      UserTasteProfile.deleteMany({ userId: user._id }),
+      Match.deleteMany({ $or: [{ userA: user._id }, { userB: user._id }] }),
+    ])
 
     const token = generateToken(user._id, false)
     sendTokenCookie(res, token)

@@ -134,7 +134,6 @@ function buildTasteProfileVectorSearchPipeline({
 }) {
   const baseFilter = {
     matchingEnabled: true,
-    onboardingStage: 'complete',
   };
 
   if (excludeUserId) {

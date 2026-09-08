@@ -5,6 +5,7 @@ import Recommendations from './pages/Recommendations'
 import Watchlist from './pages/Watchlist'
 import Diary from './pages/Diary'
 import Settings from './pages/Settings'
+import CinephileTwin from './pages/CinephileTwin'
 import LoginPage from './pages/AuthLogin'
 import RegisterPage from './pages/Register'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -45,6 +46,22 @@ function App() {
           element={
             <ProtectedRoute requireComplete={true}>
               <Diary />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/twin"
+          element={
+            <ProtectedRoute requireComplete={true}>
+              <CinephileTwin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cinephile-twin"
+          element={
+            <ProtectedRoute requireComplete={true}>
+              <CinephileTwin />
             </ProtectedRoute>
           }
         />

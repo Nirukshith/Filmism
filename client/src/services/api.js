@@ -18,6 +18,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !isAuthRoute) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      localStorage.removeItem('filmism_taste_clusters')
+      localStorage.removeItem('filmism_ai_synthesis')
+      window.dispatchEvent(new Event('filmism_auth_update'))
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
@@ -33,6 +36,13 @@ export const authAPI = {
   logout: () => api.post('/auth/logout'),
   verifyOtp: (data) => api.post('/auth/verify-otp', data),
   resendOtp: (data) => api.post('/auth/resend-otp', data),
+}
+
+// Cinephile Twin matching endpoints
+export const matchingAPI = {
+  toggleOptIn: (matchingEnabled) => api.patch('/matching/opt-in', { matchingEnabled }),
+  getCurrentMatch: () => api.get('/matching/current'),
+  findMatch: () => api.post('/matching/find'),
 }
 
 export default api

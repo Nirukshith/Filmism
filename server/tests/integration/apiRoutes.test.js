@@ -87,4 +87,27 @@ describe('API Route Integration Tests', () => {
       expect(res.body.success).toBe(false);
     });
   });
+
+  describe('Matching Routes (Auth Enforcement)', () => {
+    it('PATCH /api/matching/opt-in should return 401 when unauthorized', async () => {
+      const res = await request(app)
+        .patch('/api/matching/opt-in')
+        .send({ matchingEnabled: true });
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toContain('Not authorized');
+    });
+
+    it('GET /api/matching/current should return 401 when unauthorized', async () => {
+      const res = await request(app).get('/api/matching/current');
+      expect(res.status).toBe(401);
+      expect(res.body.message).toContain('Not authorized');
+    });
+
+    it('POST /api/matching/find should return 401 when unauthorized', async () => {
+      const res = await request(app).post('/api/matching/find');
+      expect(res.status).toBe(401);
+      expect(res.body.message).toContain('Not authorized');
+    });
+  });
 });

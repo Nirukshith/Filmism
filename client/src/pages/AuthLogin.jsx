@@ -253,20 +253,36 @@ const PasswordInput = styled(Input)`
 const ShowPasswordBtn = styled.button`
   position: absolute;
   right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
-  font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
   color: #888;
   cursor: pointer;
-  text-transform: lowercase;
-  padding: 0;
+  padding: 0.35rem 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: color 0.2s;
 
   &:hover {
     color: #111;
   }
 `
+
+const EyeIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const EyeOffIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+)
 
 const ForgotLink = styled(Link)`
   font-family: 'Lexend Deca', sans-serif;
@@ -403,6 +419,7 @@ function LoginPage() {
         localStorage.setItem('user', JSON.stringify(response.data))
         localStorage.setItem('filmism_needs_refresh', 'true')  // force fresh matches on next dashboard load
         localStorage.setItem('filmism_is_returning_user', 'true')
+        window.dispatchEvent(new Event('filmism_auth_update'))
       }
 
       const user = response.data
@@ -470,8 +487,9 @@ function LoginPage() {
               <ShowPasswordBtn
                 type="button"
                 onClick={() => setShowPass((prev) => !prev)}
+                aria-label={showPass ? 'Hide password' : 'Show password'}
               >
-                {showPass ? 'hide' : 'show'}
+                {showPass ? <EyeOffIcon /> : <EyeIcon />}
               </ShowPasswordBtn>
             </PasswordInputWrap>
             {errors.password && <ErrorText>{errors.password}</ErrorText>}

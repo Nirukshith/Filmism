@@ -124,7 +124,7 @@ describe('Matching Service Unit Tests (Phase 3)', () => {
       const fakeUserId = new mongoose.Types.ObjectId();
       await expect(findCinephileTwin(fakeUserId)).rejects.toMatchObject({
         statusCode: 400,
-        message: expect.stringContaining('onboarding must be complete'),
+        message: expect.stringContaining('taste centroid'),
       });
     });
   });
