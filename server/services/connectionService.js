@@ -6,6 +6,106 @@ const User = require('../models/userModel');
 const notificationService = require('./notificationService');
 
 /**
+ * Check if a block relationship exists between two users.
+ */
+async function findBlockBetween(userAId, userBId) {
+  return Block.findOne({
+    $or: [
+      { blocker: userAId, blocked: userBId },
+      { blocker: userBId, blocked: userAId },
+    ],
+  }).lean();
+}
+
+/**
+ * Get all user IDs that either blocked or were blocked by the given user.
+ */
+async function getBlockedPartnerUserIds(userObjId) {
+  const blocks = await Block.find({
+    $or: [{ blocker: userObjId }, { blocked: userObjId }],
+  }).lean();
+
+  return blocks.map((b) =>
+    b.blocker.toString() === userObjId.toString() ? b.blocked : b.blocker
+  );
+}
+
+/**
+ * Creates or retrieves an active mutual conversation between two users upon connection acceptance.
+ */
+async function findOrCreateMutualConversation(userAId, userBId, matchRequestId) {
+  return Conversation.findOneAndUpdate(
+    {
+      $or: [
+        { userA: userAId, userB: userBId },
+        { userA: userBId, userB: userAId },
+      ],
+    },
+    {
+      $setOnInsert: {
+        participants: [userAId, userBId],
+        matchRequestId,
+        isActive: true,
+        readState: [
+          { user: userAId, lastReadAt: new Date() },
+          { user: userBId, lastReadAt: new Date() },
+        ],
+      },
+    },
+    { upsert: true, new: true }
+  );
+}
+
+/**
+ * Safely dispatches a connection_accepted notification.
+ */
+async function sendConnectionAcceptedNotification({
+  recipientId,
+  senderId,
+  conversationId,
+  requestId,
+  actionLabel = 'connected with you',
+}) {
+  try {
+    const senderUser = await User.findById(senderId).select('firstName').lean();
+    await notificationService.createNotification({
+      recipient: recipientId,
+      sender: senderId,
+      type: 'connection_accepted',
+      title: 'Connection Request Accepted!',
+      body: `${senderUser?.firstName || 'Your Cinephile Twin'} ${actionLabel}. You can now chat!`,
+      data: {
+        conversationId,
+        requestId,
+      },
+    });
+  } catch (notifErr) {
+    console.error('Failed to create connection accepted notification:', notifErr.message);
+  }
+}
+
+/**
+ * Safely dispatches a new connection request notification.
+ */
+async function sendConnectionRequestNotification({ recipientId, senderId, requestId }) {
+  try {
+    const senderUser = await User.findById(senderId).select('firstName').lean();
+    await notificationService.createNotification({
+      recipient: recipientId,
+      sender: senderId,
+      type: 'connection_request',
+      title: 'New Cinephile Connection Request',
+      body: `${senderUser?.firstName || 'A cinephile'} sent you a connection request.`,
+      data: {
+        requestId,
+      },
+    });
+  } catch (notifErr) {
+    console.error('Failed to create connection request notification:', notifErr.message);
+  }
+}
+
+/**
  * Send a connect request to a matched user.
  * Implements silent block failure, duplicate prevention, and reciprocal auto-acceptance.
  */
@@ -29,13 +129,7 @@ async function sendConnectRequest({ fromUserId, toUserId, matchId, message }) {
   }
 
   // 3. Silent block check: if either user has blocked the other, silently succeed to prevent block discovery
-  const isBlocked = await Block.findOne({
-    $or: [
-      { blocker: fromUserObjId, blocked: toUserObjId },
-      { blocker: toUserObjId, blocked: fromUserObjId },
-    ],
-  }).lean();
-
+  const isBlocked = await findBlockBetween(fromUserObjId, toUserObjId);
   if (isBlocked) {
     return {
       success: true,
@@ -58,44 +152,20 @@ async function sendConnectRequest({ fromUserId, toUserId, matchId, message }) {
     await reciprocalRequest.save();
 
     // Create or retrieve existing Conversation
-    const conversation = await Conversation.findOneAndUpdate(
-      {
-        $or: [
-          { userA: fromUserObjId, userB: toUserObjId },
-          { userA: toUserObjId, userB: fromUserObjId },
-        ],
-      },
-      {
-        $setOnInsert: {
-          participants: [fromUserObjId, toUserObjId],
-          matchRequestId: reciprocalRequest._id,
-          isActive: true,
-          readState: [
-            { user: fromUserObjId, lastReadAt: new Date() },
-            { user: toUserObjId, lastReadAt: new Date() },
-          ],
-        },
-      },
-      { upsert: true, new: true }
+    const conversation = await findOrCreateMutualConversation(
+      fromUserObjId,
+      toUserObjId,
+      reciprocalRequest._id
     );
 
     // Notify reciprocal sender that connection is now mutual
-    try {
-      const senderUser = await User.findById(fromUserObjId).select('firstName').lean();
-      await notificationService.createNotification({
-        recipient: toUserObjId,
-        sender: fromUserObjId,
-        type: 'connection_accepted',
-        title: 'Connection Request Accepted!',
-        body: `${senderUser?.firstName || 'Your Cinephile Twin'} connected with you. You can now chat!`,
-        data: {
-          conversationId: conversation._id,
-          requestId: reciprocalRequest._id,
-        },
-      });
-    } catch (notifErr) {
-      console.error('Failed to create connection accepted notification:', notifErr.message);
-    }
+    await sendConnectionAcceptedNotification({
+      recipientId: toUserObjId,
+      senderId: fromUserObjId,
+      conversationId: conversation._id,
+      requestId: reciprocalRequest._id,
+      actionLabel: 'connected with you',
+    });
 
     return {
       success: true,
@@ -141,21 +211,11 @@ async function sendConnectRequest({ fromUserId, toUserId, matchId, message }) {
     existingRequest.respondedAt = null;
     await existingRequest.save();
 
-    try {
-      const senderUser = await User.findById(fromUserObjId).select('firstName').lean();
-      await notificationService.createNotification({
-        recipient: toUserObjId,
-        sender: fromUserObjId,
-        type: 'connection_request',
-        title: 'New Cinephile Connection Request',
-        body: `${senderUser?.firstName || 'A cinephile'} sent you a connection request.`,
-        data: {
-          requestId: existingRequest._id,
-        },
-      });
-    } catch (notifErr) {
-      console.error('Failed to create connection request notification:', notifErr.message);
-    }
+    await sendConnectionRequestNotification({
+      recipientId: toUserObjId,
+      senderId: fromUserObjId,
+      requestId: existingRequest._id,
+    });
 
     return {
       success: true,
@@ -174,21 +234,11 @@ async function sendConnectRequest({ fromUserId, toUserId, matchId, message }) {
     status: 'pending',
   });
 
-  try {
-    const senderUser = await User.findById(fromUserObjId).select('firstName').lean();
-    await notificationService.createNotification({
-      recipient: toUserObjId,
-      sender: fromUserObjId,
-      type: 'connection_request',
-      title: 'New Cinephile Connection Request',
-      body: `${senderUser?.firstName || 'A cinephile'} sent you a connection request.`,
-      data: {
-        requestId: newRequest._id,
-      },
-    });
-  } catch (notifErr) {
-    console.error('Failed to create connection request notification:', notifErr.message);
-  }
+  await sendConnectionRequestNotification({
+    recipientId: toUserObjId,
+    senderId: fromUserObjId,
+    requestId: newRequest._id,
+  });
 
   return {
     success: true,
@@ -206,13 +256,7 @@ async function getPendingRequests(userId) {
   const userObjId = new mongoose.Types.ObjectId(userId);
 
   // 1. Identify all blocked partners
-  const blocks = await Block.find({
-    $or: [{ blocker: userObjId }, { blocked: userObjId }],
-  }).lean();
-
-  const blockedUserIds = blocks.map((b) =>
-    b.blocker.toString() === userObjId.toString() ? b.blocked : b.blocker
-  );
+  const blockedUserIds = await getBlockedPartnerUserIds(userObjId);
 
   // 2. Fetch incoming pending requests
   const incoming = await MatchRequest.find({
@@ -286,12 +330,7 @@ async function respondToRequest({ userId, requestId, action }) {
   }
 
   // Check if either user has blocked the other
-  const isBlocked = await Block.findOne({
-    $or: [
-      { blocker: userObjId, blocked: request.fromUser },
-      { blocker: request.fromUser, blocked: userObjId },
-    ],
-  }).lean();
+  const isBlocked = await findBlockBetween(userObjId, request.fromUser);
 
   if (isBlocked) {
     request.status = 'declined';
@@ -310,44 +349,20 @@ async function respondToRequest({ userId, requestId, action }) {
     await request.save();
 
     // Create or find active Conversation
-    const conversation = await Conversation.findOneAndUpdate(
-      {
-        $or: [
-          { userA: request.fromUser, userB: userObjId },
-          { userA: userObjId, userB: request.fromUser },
-        ],
-      },
-      {
-        $setOnInsert: {
-          participants: [request.fromUser, userObjId],
-          matchRequestId: request._id,
-          isActive: true,
-          readState: [
-            { user: request.fromUser, lastReadAt: new Date() },
-            { user: userObjId, lastReadAt: new Date() },
-          ],
-        },
-      },
-      { upsert: true, new: true }
+    const conversation = await findOrCreateMutualConversation(
+      request.fromUser,
+      userObjId,
+      request._id
     );
 
     // Notify requester that connection was accepted
-    try {
-      const acceptingUser = await User.findById(userObjId).select('firstName').lean();
-      await notificationService.createNotification({
-        recipient: request.fromUser,
-        sender: userObjId,
-        type: 'connection_accepted',
-        title: 'Connection Request Accepted!',
-        body: `${acceptingUser?.firstName || 'Your Cinephile Twin'} accepted your connection request. You can now chat!`,
-        data: {
-          conversationId: conversation._id,
-          requestId: request._id,
-        },
-      });
-    } catch (notifErr) {
-      console.error('Failed to create connection accepted notification:', notifErr.message);
-    }
+    await sendConnectionAcceptedNotification({
+      recipientId: request.fromUser,
+      senderId: userObjId,
+      conversationId: conversation._id,
+      requestId: request._id,
+      actionLabel: 'accepted your connection request',
+    });
 
     return {
       success: true,

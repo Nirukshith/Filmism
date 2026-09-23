@@ -6,6 +6,97 @@ const User = require('../models/userModel');
 const notificationService = require('./notificationService');
 
 /**
+ * Safely extracts a string ID from a participant whether populated or ObjectId.
+ */
+function getParticipantId(participant) {
+  return (participant?._id || participant)?.toString();
+}
+
+/**
+ * Finds the other participant in a conversation.
+ */
+function getConversationPartner(participants, currentUserId) {
+  const currentUserIdStr = currentUserId.toString();
+  return (participants || []).find(
+    (p) => getParticipantId(p) !== currentUserIdStr
+  );
+}
+
+/**
+ * Validates that the conversation exists and that the user is an active participant (IDOR safeguard).
+ */
+function validateConversationParticipant(
+  conversation,
+  userObjId,
+  forbiddenMessage = 'You do not have access to this conversation.'
+) {
+  if (!conversation) {
+    const err = new Error('Conversation not found.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const userObjIdStr = userObjId.toString();
+  const isParticipant = (conversation.participants || []).some(
+    (p) => getParticipantId(p) === userObjIdStr
+  );
+
+  if (!isParticipant) {
+    const err = new Error(forbiddenMessage);
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
+/**
+ * Queries for any existing block relationship between two users.
+ */
+async function findBlockBetween(userAId, userBId) {
+  const partnerId = userBId?._id || userBId;
+  if (!partnerId) return null;
+
+  return Block.findOne({
+    $or: [
+      { blocker: userAId, blocked: partnerId },
+      { blocker: partnerId, blocked: userAId },
+    ],
+  }).lean();
+}
+
+/**
+ * Resolves boolean flags for block state from a block record.
+ */
+function resolveBlockStatus(blockRecord, currentUserId, partnerIdStr) {
+  const currentUserIdStr = currentUserId.toString();
+  const isBlockedByMe = Boolean(blockRecord && blockRecord.blocker.toString() === currentUserIdStr);
+  const isBlockedByPartner = Boolean(blockRecord && blockRecord.blocker.toString() === partnerIdStr);
+  const isBlocked = Boolean(blockRecord);
+
+  return {
+    isBlocked,
+    isBlockedByMe,
+    isBlockedByPartner,
+    canMessage: !isBlocked,
+  };
+}
+
+/**
+ * Verifies that the sender has not blocked or been blocked before sending a message.
+ */
+function assertCanSendMessage(blockRecord, userObjId) {
+  if (blockRecord) {
+    if (blockRecord.blocker.toString() === userObjId.toString()) {
+      const err = new Error('You have blocked this user. Please unblock them to send a message.');
+      err.statusCode = 403;
+      throw err;
+    }
+    const err = new Error('Cannot send message to this conversation.');
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
+/**
  * Retrieve all active conversations for the authenticated user,
  * populated with partner public profile data, unread status, and block status.
  */
@@ -28,11 +119,8 @@ async function getUserConversations(userId) {
 
   // 3. Format conversations with partner details, block status, and unread indicator
   return conversations.map((conv) => {
-    const partner = conv.participants.find(
-      (p) => p._id.toString() !== userObjId.toString()
-    );
-
-    const partnerIdStr = partner?._id?.toString();
+    const partner = getConversationPartner(conv.participants, userObjId);
+    const partnerIdStr = getParticipantId(partner);
 
     const isBlockedByMe = blocks.some(
       (b) => b.blocker.toString() === userObjId.toString() && b.blocked.toString() === partnerIdStr
@@ -65,10 +153,10 @@ async function getUserConversations(userId) {
       },
       lastMessage: conv.lastMessage
         ? {
-            text: conv.lastMessage.text,
-            sender: conv.lastMessage.sender,
-            sentAt: conv.lastMessage.sentAt,
-          }
+          text: conv.lastMessage.text,
+          sender: conv.lastMessage.sender,
+          sentAt: conv.lastMessage.sentAt,
+        }
         : null,
       lastMessageAt: conv.lastMessageAt,
       hasUnread,
@@ -96,38 +184,18 @@ async function getConversationMessages(userId, conversationId, options = {}) {
     .populate('participants', 'firstName lastName profilePicture')
     .lean();
 
-  if (!conversation) {
-    const err = new Error('Conversation not found.');
-    err.statusCode = 404;
-    throw err;
-  }
+  validateConversationParticipant(conversation, userObjId);
 
-  const isParticipant = conversation.participants.some(
-    (p) => p._id.toString() === userObjId.toString()
-  );
-
-  if (!isParticipant) {
-    const err = new Error('You do not have access to this conversation.');
-    err.statusCode = 403;
-    throw err;
-  }
-
-  const partner = conversation.participants.find(
-    (p) => p._id.toString() !== userObjId.toString()
-  );
-  const partnerIdStr = partner?._id?.toString();
+  const partner = getConversationPartner(conversation.participants, userObjId);
+  const partnerIdStr = getParticipantId(partner);
 
   // 2. Check if either user has blocked the other
-  const blockRecord = await Block.findOne({
-    $or: [
-      { blocker: userObjId, blocked: partner?._id },
-      { blocker: partner?._id, blocked: userObjId },
-    ],
-  }).lean();
-
-  const isBlockedByMe = Boolean(blockRecord && blockRecord.blocker.toString() === userObjId.toString());
-  const isBlockedByPartner = Boolean(blockRecord && blockRecord.blocker.toString() === partnerIdStr);
-  const isBlocked = Boolean(blockRecord);
+  const blockRecord = await findBlockBetween(userObjId, partner?._id);
+  const { isBlocked, isBlockedByMe, isBlockedByPartner, canMessage } = resolveBlockStatus(
+    blockRecord,
+    userObjId,
+    partnerIdStr
+  );
 
   // 3. Build message query with cursor support
   const query = { conversationId: convObjId };
@@ -166,7 +234,7 @@ async function getConversationMessages(userId, conversationId, options = {}) {
     isBlocked,
     isBlockedByMe,
     isBlockedByPartner,
-    canMessage: !isBlocked,
+    canMessage,
     messages: messages.map((m) => ({
       messageId: m._id,
       conversationId: m.conversationId,
@@ -187,44 +255,17 @@ async function sendMessage(userId, conversationId, text) {
 
   // 1. Fetch conversation & enforce IDOR check
   const conversation = await Conversation.findById(convObjId);
-  if (!conversation) {
-    const err = new Error('Conversation not found.');
-    err.statusCode = 404;
-    throw err;
-  }
-
-  const isParticipant = conversation.participants.some(
-    (p) => p.toString() === userObjId.toString()
+  validateConversationParticipant(
+    conversation,
+    userObjId,
+    'You do not have access to send messages to this conversation.'
   );
 
-  if (!isParticipant) {
-    const err = new Error('You do not have access to send messages to this conversation.');
-    err.statusCode = 403;
-    throw err;
-  }
-
-  const partnerId = conversation.participants.find(
-    (p) => p.toString() !== userObjId.toString()
-  );
+  const partnerId = getConversationPartner(conversation.participants, userObjId);
 
   // 2. Check if either user has blocked the other
-  const blockRecord = await Block.findOne({
-    $or: [
-      { blocker: userObjId, blocked: partnerId },
-      { blocker: partnerId, blocked: userObjId },
-    ],
-  }).lean();
-
-  if (blockRecord) {
-    if (blockRecord.blocker.toString() === userObjId.toString()) {
-      const err = new Error('You have blocked this user. Please unblock them to send a message.');
-      err.statusCode = 403;
-      throw err;
-    }
-    const err = new Error('Cannot send message to this conversation.');
-    err.statusCode = 403;
-    throw err;
-  }
+  const blockRecord = await findBlockBetween(userObjId, partnerId);
+  assertCanSendMessage(blockRecord, userObjId);
 
   // 3. Create the message
   const message = await Message.create({

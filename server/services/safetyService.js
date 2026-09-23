@@ -8,6 +8,31 @@ const User = require('../models/userModel');
 const { sendBanNotificationEmail, sendWarningNotificationEmail } = require('../utils/sendEmail');
 
 /**
+ * Chains standard reporter and reportedUser populates onto a report query.
+ */
+function populateReportUsers(query) {
+  return query
+    .populate('reporter', 'firstName lastName email profilePicture')
+    .populate('reportedUser', 'firstName lastName email profilePicture isBanned bannedReason bannedAt role');
+}
+
+/**
+ * Updates isActive status on all conversations matching the query.
+ */
+async function setConversationActiveStatus(query, isActive) {
+  return Conversation.updateMany(query, { $set: { isActive } });
+}
+
+/**
+ * Cancels all pending match requests matching the query.
+ */
+async function cancelPendingMatchRequests(query) {
+  return MatchRequest.updateMany(query, {
+    $set: { status: 'cancelled', respondedAt: new Date() },
+  });
+}
+
+/**
  * Block a user:
  * 1. Creates/upserts the Block document.
  * 2. Deactivates any active Conversation between the two users.
@@ -38,26 +63,23 @@ async function blockUser(blockerId, blockedId, reason = null) {
   );
 
   // 2. Deactivate any active conversation between the two users
-  await Conversation.updateMany(
+  await setConversationActiveStatus(
     {
       $or: [
         { userA: blockerObjId, userB: blockedObjId },
         { userA: blockedObjId, userB: blockerObjId },
       ],
     },
-    { $set: { isActive: false } }
+    false
   );
 
   // 3. Invalidate any pending connection requests in either direction
-  await MatchRequest.updateMany(
-    {
-      $or: [
-        { fromUser: blockerObjId, toUser: blockedObjId, status: 'pending' },
-        { fromUser: blockedObjId, toUser: blockerObjId, status: 'pending' },
-      ],
-    },
-    { $set: { status: 'cancelled', respondedAt: new Date() } }
-  );
+  await cancelPendingMatchRequests({
+    $or: [
+      { fromUser: blockerObjId, toUser: blockedObjId, status: 'pending' },
+      { fromUser: blockedObjId, toUser: blockerObjId, status: 'pending' },
+    ],
+  });
 
   return {
     success: true,
@@ -90,14 +112,14 @@ async function unblockUser(blockerId, blockedId) {
   }).lean();
 
   if (!isOppositeBlocked) {
-    await Conversation.updateMany(
+    await setConversationActiveStatus(
       {
         $or: [
           { userA: blockerObjId, userB: blockedObjId },
           { userA: blockedObjId, userB: blockerObjId },
         ],
       },
-      { $set: { isActive: true } }
+      true
     );
   }
 
@@ -215,9 +237,7 @@ async function getReports({ status, page = 1, limit = 20 } = {}) {
   const skip = (page - 1) * limit;
 
   const [reports, total] = await Promise.all([
-    Report.find(query)
-      .populate('reporter', 'firstName lastName email profilePicture')
-      .populate('reportedUser', 'firstName lastName email profilePicture isBanned bannedReason bannedAt role')
+    populateReportUsers(Report.find(query))
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -246,14 +266,13 @@ async function updateReportStatus(reportId, { status, adminNotes, actionTaken })
   if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
   if (actionTaken !== undefined) updateData.actionTaken = actionTaken;
 
-  const report = await Report.findByIdAndUpdate(
-    reportObjId,
-    { $set: updateData },
-    { new: true }
-  )
-    .populate('reporter', 'firstName lastName email profilePicture')
-    .populate('reportedUser', 'firstName lastName email profilePicture isBanned bannedReason bannedAt role')
-    .lean();
+  const report = await populateReportUsers(
+    Report.findByIdAndUpdate(
+      reportObjId,
+      { $set: updateData },
+      { new: true }
+    )
+  ).lean();
 
   if (!report) {
     const err = new Error('Report not found.');
@@ -315,38 +334,31 @@ async function banUser(adminId, userId, reason = 'Violation of community safety 
   );
 
   // Deactivate active conversations
-  await Conversation.updateMany(
-    { participants: userObjId },
-    { $set: { isActive: false } }
-  );
+  await setConversationActiveStatus({ participants: userObjId }, false);
 
   // Cancel pending match requests
-  await MatchRequest.updateMany(
-    {
-      $or: [{ fromUser: userObjId }, { toUser: userObjId }],
-      status: 'pending',
-    },
-    { $set: { status: 'cancelled', respondedAt: new Date() } }
-  );
+  await cancelPendingMatchRequests({
+    $or: [{ fromUser: userObjId }, { toUser: userObjId }],
+    status: 'pending',
+  });
 
   // If a reportId is attached, resolve the report
   let updatedReport = null;
   if (reportId) {
     const reportObjId = new mongoose.Types.ObjectId(reportId);
-    updatedReport = await Report.findByIdAndUpdate(
-      reportObjId,
-      {
-        $set: {
-          status: 'resolved',
-          actionTaken: 'user_banned',
-          adminNotes: `User banned by admin on ${new Date().toISOString()}. Reason: ${reason}`,
+    updatedReport = await populateReportUsers(
+      Report.findByIdAndUpdate(
+        reportObjId,
+        {
+          $set: {
+            status: 'resolved',
+            actionTaken: 'user_banned',
+            adminNotes: `User banned by admin on ${new Date().toISOString()}. Reason: ${reason}`,
+          },
         },
-      },
-      { new: true }
-    )
-      .populate('reporter', 'firstName lastName email profilePicture')
-      .populate('reportedUser', 'firstName lastName email profilePicture isBanned bannedReason bannedAt role')
-      .lean();
+        { new: true }
+      )
+    ).lean();
   }
 
   return {

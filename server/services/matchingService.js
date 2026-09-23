@@ -107,22 +107,31 @@ function computeExplainability(profileA, profileB) {
 }
 
 /**
- * Find and compute a Cinephile Twin match for the requesting user.
- *
- * @param {string|ObjectId} userId - Requesting user's ID
- * @param {Object} options - Configuration options
- * @param {number} [options.recentDays=7] - Number of days to exclude previous matches
- * @param {boolean} [options.allowRecentIfExhausted=true] - Fall back to past matches if pool exhausted
- * @returns {Promise<Object>} Computed match result with partner public info
+ * Retrieve all user IDs that have a block relation with the given user.
  */
-async function findCinephileTwin(userId, options = {}) {
-  const recentDays = options.recentDays !== undefined ? options.recentDays : DEFAULT_RECENT_MATCH_DAYS;
-  const allowRecentIfExhausted = options.allowRecentIfExhausted !== false;
+async function getBlockedPartnerUserIds(userObjId) {
+  const blocks = await Block.find({
+    $or: [{ blocker: userObjId }, { blocked: userObjId }],
+  }).lean();
 
-  const requestingUserId = new mongoose.Types.ObjectId(userId);
+  return blocks.map((b) =>
+    b.blocker.toString() === userObjId.toString() ? b.blocked : b.blocker
+  );
+}
 
-  // 1. Fetch requesting user taste profile & verify eligibility
-  const userProfile = await UserTasteProfile.findOne({ userId: requestingUserId }).lean();
+/**
+ * Determine the partner's user ID from a match document.
+ */
+function getMatchPartnerUserId(matchDoc, requestingUserId) {
+  return matchDoc.userA.toString() === requestingUserId.toString()
+    ? matchDoc.userB
+    : matchDoc.userA;
+}
+
+/**
+ * Validates requesting user's taste profile for matching eligibility.
+ */
+function validateMatchingProfile(userProfile) {
   if (!userProfile) {
     const err = new Error('User taste profile not found. Please complete taste profile onboarding.');
     err.statusCode = 404;
@@ -140,28 +149,40 @@ async function findCinephileTwin(userId, options = {}) {
     err.statusCode = 400;
     throw err;
   }
+}
+
+/**
+ * Find and compute a Cinephile Twin match for the requesting user.
+ *
+ * @param {string|ObjectId} userId - Requesting user's ID
+ * @param {Object} options - Configuration options
+ * @param {number} [options.recentDays=7] - Number of days to exclude previous matches
+ * @param {boolean} [options.allowRecentIfExhausted=true] - Fall back to past matches if pool exhausted
+ * @returns {Promise<Object>} Computed match result with partner public info
+ */
+async function findCinephileTwin(userId, options = {}) {
+  const recentDays = options.recentDays !== undefined ? options.recentDays : DEFAULT_RECENT_MATCH_DAYS;
+  const allowRecentIfExhausted = options.allowRecentIfExhausted !== false;
+
+  const requestingUserId = new mongoose.Types.ObjectId(userId);
+
+  // 1. Fetch requesting user taste profile & verify eligibility
+  const userProfile = await UserTasteProfile.findOne({ userId: requestingUserId }).lean();
+  validateMatchingProfile(userProfile);
 
   // 2. Identify recently matched users and blocked users to avoid duplicates/unwanted contact
   const cutoffDate = new Date(Date.now() - recentDays * 24 * 60 * 60 * 1000);
-  const [recentMatches, blocks] = await Promise.all([
+  const [recentMatches, blockedUserIds] = await Promise.all([
     Match.find({
       $or: [{ userA: requestingUserId }, { userB: requestingUserId }],
       createdAt: { $gte: cutoffDate },
     }).lean(),
-    Block.find({
-      $or: [{ blocker: requestingUserId }, { blocked: requestingUserId }],
-    }).lean(),
+    getBlockedPartnerUserIds(requestingUserId),
   ]);
 
   // create a set of excluded user ids (already matched or blocked)
-  const excludedUserIds = recentMatches.map((m) =>
-    m.userA.toString() === requestingUserId.toString() ? m.userB : m.userA
-  );
-  blocks.forEach((b) => {
-    const blockedPartner =
-      b.blocker.toString() === requestingUserId.toString() ? b.blocked : b.blocker;
-    excludedUserIds.push(blockedPartner);
-  });
+  const excludedUserIds = recentMatches.map((m) => getMatchPartnerUserId(m, requestingUserId));
+  excludedUserIds.push(...blockedUserIds);
   excludedUserIds.push(requestingUserId);
 
   let candidate = null;
@@ -264,12 +285,7 @@ async function findCinephileTwin(userId, options = {}) {
 async function getCurrentMatch(userId) {
   const requestingUserId = new mongoose.Types.ObjectId(userId);
 
-  const blocks = await Block.find({
-    $or: [{ blocker: requestingUserId }, { blocked: requestingUserId }],
-  }).lean();
-  const blockedUserIds = blocks.map((b) =>
-    b.blocker.toString() === requestingUserId.toString() ? b.blocked : b.blocker
-  );
+  const blockedUserIds = await getBlockedPartnerUserIds(requestingUserId);
 
   const match = await Match.findOne({
     $or: [{ userA: requestingUserId }, { userB: requestingUserId }],
@@ -281,8 +297,7 @@ async function getCurrentMatch(userId) {
 
   if (!match) return null;
 
-  const partnerUserId =
-    match.userA.toString() === requestingUserId.toString() ? match.userB : match.userA;
+  const partnerUserId = getMatchPartnerUserId(match, requestingUserId);
 
   const partnerUser = await User.findById(partnerUserId)
     .select('firstName lastName profilePicture')
@@ -296,6 +311,7 @@ async function getCurrentMatch(userId) {
  */
 function formatMatchResponse(matchDoc, requestingUserId, partnerUser) {
   const isUserA = matchDoc.userA.toString() === requestingUserId.toString();
+  const partnerUserId = getMatchPartnerUserId(matchDoc, requestingUserId);
 
   const formattedClusters = (matchDoc.sharedClusters || []).map((sc) => ({
     clusterName: sc.clusterName,
@@ -309,7 +325,7 @@ function formatMatchResponse(matchDoc, requestingUserId, partnerUser) {
     similarityScore: matchDoc.similarityScore,
     matchedAt: matchDoc.createdAt,
     twin: {
-      userId: partnerUser?._id || (isUserA ? matchDoc.userB : matchDoc.userA),
+      userId: partnerUser?._id || partnerUserId,
       firstName: partnerUser?.firstName || 'Fellow Cinephile',
       profilePicture: partnerUser?.profilePicture || null,
     },

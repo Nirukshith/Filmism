@@ -539,6 +539,61 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
   };
 }
 
+const RATING_LABELS = {
+  1: 'not for me',
+  2: 'okay',
+  3: 'good',
+  4: 'great',
+  0: "haven't watched",
+};
+
+/**
+ * Standardize favorite item format into { tmdbId, rating, ratingLabel }.
+ */
+function normalizeFavoriteItem(item) {
+  if (typeof item === 'number' || typeof item === 'string') {
+    const id = Number(item);
+    return isNaN(id) ? null : { tmdbId: id, rating: 3, ratingLabel: 'good' };
+  }
+  const id = Number(item?.tmdbId || item?.id);
+  if (isNaN(id)) return null;
+  const rating = item?.rating !== undefined ? Number(item.rating) : 3;
+  return {
+    tmdbId: id,
+    rating,
+    ratingLabel: RATING_LABELS[rating] || 'good',
+  };
+}
+
+/**
+ * Enriches normalized favorite items with title, year, and posterPath from profiled movies.
+ */
+function enrichFavoritesWithMetadata(favorites, filmMap) {
+  return (favorites || [])
+    .map((fav) => {
+      const doc = filmMap.get(fav.tmdbId);
+      if (!doc) return null;
+      return {
+        ...fav,
+        title: doc.title,
+        year: doc.releaseYear,
+        posterPath: doc.posterPath,
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Shifts and normalizes a cluster centroid vector towards an input embedding by alpha.
+ */
+function blendCentroidEmbedding(currentCentroid, targetEmbedding, alpha) {
+  const updatedVector = currentCentroid.map((val, idx) => {
+    return val + alpha * (targetEmbedding[idx] || 0);
+  });
+  const norm = Math.sqrt(updatedVector.reduce((sum, v) => sum + v * v, 0)) || 1;
+  return updatedVector.map((v) => Number((v / norm).toFixed(6)));
+}
+
 /**
  * Build rich multi-cluster taste profile from user favorites and ratings.
  */
@@ -554,19 +609,7 @@ async function buildTasteProfileFromFavorites({
   }
 
   // Standardize favorites format
-  const normalizedFavorites = favorites.map((f) => {
-    if (typeof f === 'number' || typeof f === 'string') {
-      return { tmdbId: Number(f), rating: 3, ratingLabel: 'good' };
-    }
-    const r = f.rating !== undefined ? Number(f.rating) : 3;
-    const labels = { 1: 'not for me', 2: 'okay', 3: 'good', 4: 'great', 0: 'haven\'t watched' };
-    return {
-      tmdbId: Number(f.tmdbId || f.id),
-      rating: r,
-      ratingLabel: labels[r] || 'good',
-    };
-  });
-
+  const normalizedFavorites = favorites.map(normalizeFavoriteItem).filter(Boolean);
   const tmdbIds = normalizedFavorites.map((f) => f.tmdbId);
 
   // 1. Batch profile all favorite films (ensures AI metadata + vector embeddings exist)
@@ -576,18 +619,7 @@ async function buildTasteProfileFromFavorites({
   profiledFilms.forEach((f) => filmMap.set(f.tmdbId, f));
 
   // Attach metadata to favorites
-  const enrichedFavorites = normalizedFavorites
-    .map((fav) => {
-      const doc = filmMap.get(fav.tmdbId);
-      if (!doc) return null;
-      return {
-        ...fav,
-        title: doc.title,
-        year: doc.releaseYear,
-        posterPath: doc.posterPath,
-      };
-    })
-    .filter(Boolean);
+  const enrichedFavorites = enrichFavoritesWithMetadata(normalizedFavorites, filmMap);
 
   // 2. Discover semantic taste clusters
   const validProfiledDocs = enrichedFavorites
@@ -740,26 +772,13 @@ async function appendFavoritesToTasteProfile({
   }
 
   const existingIds = new Set((profile.favorites || []).map((f) => Number(f.tmdbId)));
-  const labels = { 1: 'not for me', 2: 'okay', 3: 'good', 4: 'great', 0: 'haven\'t watched' };
   const normalizedNew = [];
 
   newFavorites.forEach((f) => {
-    let id, rating;
-    if (typeof f === 'number' || typeof f === 'string') {
-      id = Number(f);
-      rating = 3;
-    } else {
-      id = Number(f.tmdbId || f.id);
-      rating = f.rating !== undefined ? Number(f.rating) : 3;
-    }
-
-    if (!isNaN(id) && !existingIds.has(id)) {
-      normalizedNew.push({
-        tmdbId: id,
-        rating,
-        ratingLabel: labels[rating] || 'good',
-      });
-      existingIds.add(id);
+    const item = normalizeFavoriteItem(f);
+    if (item && !existingIds.has(item.tmdbId)) {
+      normalizedNew.push(item);
+      existingIds.add(item.tmdbId);
     }
   });
 
@@ -779,18 +798,7 @@ async function appendFavoritesToTasteProfile({
   const filmMap = new Map();
   profiledFilms.forEach((f) => filmMap.set(f.tmdbId, f));
 
-  const enrichedNewFavorites = normalizedNew
-    .map((fav) => {
-      const doc = filmMap.get(fav.tmdbId);
-      if (!doc) return null;
-      return {
-        ...fav,
-        title: doc.title,
-        year: doc.releaseYear,
-        posterPath: doc.posterPath,
-      };
-    })
-    .filter(Boolean);
+  const enrichedNewFavorites = enrichFavoritesWithMetadata(normalizedNew, filmMap);
 
   // 2. Incremental update across existing clusters
   const clusters = profile.tasteClusters || [];
@@ -817,11 +825,11 @@ async function appendFavoritesToTasteProfile({
     if (bestCluster) {
       if (bestCluster.centroidEmbedding?.length > 0 && movieDoc.embedding?.length > 0) {
         const alpha = 0.20 * ratingMultiplier;
-        const updatedVector = bestCluster.centroidEmbedding.map((val, idx) => {
-          return val + alpha * (movieDoc.embedding[idx] || 0);
-        });
-        const norm = Math.sqrt(updatedVector.reduce((sum, v) => sum + v * v, 0)) || 1;
-        bestCluster.centroidEmbedding = updatedVector.map((v) => Number((v / norm).toFixed(6)));
+        bestCluster.centroidEmbedding = blendCentroidEmbedding(
+          bestCluster.centroidEmbedding,
+          movieDoc.embedding,
+          alpha
+        );
       }
 
       if (!bestCluster.sourceFavoriteIds.includes(fav.tmdbId)) {

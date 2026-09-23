@@ -20,6 +20,43 @@ const ACTION_LEARNING_RATES = {
 };
 
 /**
+ * Remove an interacted or watched film from the user's cached recommendation array.
+ */
+function purgeFromRecommendationCache(profile, numericTmdbId) {
+  if (profile && Array.isArray(profile.cachedRecommendations)) {
+    profile.cachedRecommendations = profile.cachedRecommendations.filter(
+      (r) => Number(r.id || r.tmdbId) !== numericTmdbId
+    );
+  }
+}
+
+/**
+ * Shifts and normalizes a cluster's centroid embedding towards a film's embedding.
+ */
+function shiftClusterCentroid(cluster, movieEmbedding, alpha) {
+  if (!cluster?.centroidEmbedding?.length || !movieEmbedding?.length) return;
+  const updatedVec = cluster.centroidEmbedding.map((val, idx) => {
+    return val + alpha * (movieEmbedding[idx] || 0);
+  });
+  const norm = Math.sqrt(updatedVec.reduce((sum, v) => sum + v * v, 0)) || 1;
+  cluster.centroidEmbedding = updatedVec.map((v) => Number((v / norm).toFixed(6)));
+}
+
+/**
+ * Adjust theme tag weights in a cluster based on movie themes and learning rate.
+ */
+function adjustClusterThemeTags(cluster, themes, boost, { minWeight = 0.05, addNew = false } = {}) {
+  (themes || []).forEach((t) => {
+    const tag = cluster.topThemes.find((theme) => theme.tag === t);
+    if (tag) {
+      tag.weight = Math.max(minWeight, Number((tag.weight + boost).toFixed(2)));
+    } else if (addNew && boost > 0) {
+      cluster.topThemes.push({ tag: t, weight: 0.6 });
+    }
+  });
+}
+
+/**
  * Log user action on a recommendation (shown, watchlisted, dismissed, watched).
  */
 async function recordRecommendationAction({
@@ -53,8 +90,8 @@ async function recordRecommendationAction({
 
   if (profile) {
     // Immediately remove from cached recommendations if watchlisted, watched, or dismissed
-    if (['watchlisted', 'watched', 'dismissed'].includes(action) && Array.isArray(profile.cachedRecommendations)) {
-      profile.cachedRecommendations = profile.cachedRecommendations.filter((r) => Number(r.id || r.tmdbId) !== numericId);
+    if (['watchlisted', 'watched', 'dismissed'].includes(action)) {
+      purgeFromRecommendationCache(profile, numericId);
     }
 
     if (actionRate && actionRate.centroidPull !== 0) {
@@ -64,22 +101,10 @@ async function recordRecommendationAction({
         // Retrieve movie profile embedding
         try {
           const { profile: movieDoc } = await movieProfilingService.getOrProfileMovie(numericId);
-          if (movieDoc?.embedding?.length > 0 && cluster.centroidEmbedding?.length > 0) {
-            const alpha = actionRate.centroidPull * 0.08; // Mild intent learning rate
-            const updatedVec = cluster.centroidEmbedding.map((val, idx) => {
-              return val + alpha * (movieDoc.embedding[idx] || 0);
-            });
-            const norm = Math.sqrt(updatedVec.reduce((sum, v) => sum + v * v, 0)) || 1;
-            cluster.centroidEmbedding = updatedVec.map((v) => Number((v / norm).toFixed(6)));
-          }
-
-          // Adjust tag weights
-          const themes = movieDoc?.profile?.themes || [];
-          themes.forEach((t) => {
-            const tag = cluster.topThemes.find((theme) => theme.tag === t);
-            if (tag) {
-              tag.weight = Math.max(0.1, Number((tag.weight + actionRate.tagBoost * 0.1).toFixed(2)));
-            }
+          shiftClusterCentroid(cluster, movieDoc?.embedding, actionRate.centroidPull * 0.08);
+          adjustClusterThemeTags(cluster, movieDoc?.profile?.themes, actionRate.tagBoost * 0.1, {
+            minWeight: 0.1,
+            addNew: false,
           });
         } catch (e) {
           console.warn('Profile update on action warning:', e.message);
@@ -131,9 +156,7 @@ async function recordPostWatchOutcome({
   const profile = await UserTasteProfile.findOne(query);
 
   if (profile) {
-    if (Array.isArray(profile.cachedRecommendations)) {
-      profile.cachedRecommendations = profile.cachedRecommendations.filter((r) => Number(r.id || r.tmdbId) !== numericId);
-    }
+    purgeFromRecommendationCache(profile, numericId);
 
     const cluster = profile.tasteClusters.find((c) => c.clusterId === sourceClusterId) || profile.tasteClusters[0];
 
@@ -142,24 +165,12 @@ async function recordPostWatchOutcome({
         const { profile: movieDoc } = await movieProfilingService.getOrProfileMovie(numericId);
 
         // Shift cluster centroid vector with strong outcome weight
-        if (movieDoc?.embedding?.length > 0 && cluster.centroidEmbedding?.length > 0) {
-          const alpha = learningRule.centroidPull * 0.25; // Strong outcome learning rate
-          const updatedVec = cluster.centroidEmbedding.map((val, idx) => {
-            return val + alpha * (movieDoc.embedding[idx] || 0);
-          });
-          const norm = Math.sqrt(updatedVec.reduce((sum, v) => sum + v * v, 0)) || 1;
-          cluster.centroidEmbedding = updatedVec.map((v) => Number((v / norm).toFixed(6)));
-        }
+        shiftClusterCentroid(cluster, movieDoc?.embedding, learningRule.centroidPull * 0.25);
 
         // Adjust cluster tags
-        const themes = movieDoc?.profile?.themes || [];
-        themes.forEach((t) => {
-          const tag = cluster.topThemes.find((theme) => theme.tag === t);
-          if (tag) {
-            tag.weight = Math.max(0.05, Number((tag.weight + learningRule.tagBoost * 0.25).toFixed(2)));
-          } else if (learningRule.tagBoost > 0) {
-            cluster.topThemes.push({ tag: t, weight: 0.6 });
-          }
+        adjustClusterThemeTags(cluster, movieDoc?.profile?.themes, learningRule.tagBoost * 0.25, {
+          minWeight: 0.05,
+          addNew: true,
         });
 
         // If outcome is great (4) or good (3), boost cluster share weight
