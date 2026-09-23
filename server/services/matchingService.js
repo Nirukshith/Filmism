@@ -39,6 +39,8 @@ function computeExplainability(profileA, profileB) {
           highestSim = sim;
           bestMatchCluster = cB;
         }
+        // if embedding vectors are not available (maybe during the intial training)
+        // fallback to name based matching
       } else if (cA.name && cB.name && cA.name.toLowerCase() === cB.name.toLowerCase()) {
         highestSim = 1.0;
         bestMatchCluster = cB;
@@ -151,6 +153,7 @@ async function findCinephileTwin(userId, options = {}) {
     }).lean(),
   ]);
 
+  // create a set of excluded user ids (already matched or blocked)
   const excludedUserIds = recentMatches.map((m) =>
     m.userA.toString() === requestingUserId.toString() ? m.userB : m.userA
   );

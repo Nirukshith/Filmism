@@ -1258,6 +1258,10 @@ function Settings() {
       setPwdStatus({ loading: false, error: 'New password must contain at least one uppercase letter.', success: '' })
       return
     }
+    if (!/\d/.test(pwd.new)) {
+      setPwdStatus({ loading: false, error: 'New password must contain at least one number.', success: '' })
+      return
+    }
     if (!/[^A-Za-z0-9]/.test(pwd.new)) {
       setPwdStatus({ loading: false, error: 'New password must contain at least one special character.', success: '' })
       return

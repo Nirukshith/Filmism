@@ -77,7 +77,11 @@ const getRankedRecommendations = async (req, res, next) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 12;
 
-    const refresh = req.query.refresh === 'true' || req.query.forceRefresh === 'true';
+    const refresh =
+      req.query.refresh === true ||
+      req.query.refresh === 'true' ||
+      req.query.forceRefresh === true ||
+      req.query.forceRefresh === 'true';
 
     const query = userId ? { userId } : { sessionId };
     const profile = await UserTasteProfile.findOne(query).sort({ updatedAt: -1 });

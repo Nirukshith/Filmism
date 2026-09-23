@@ -1236,7 +1236,7 @@ function TasteProfile() {
               filmCache,
             })
           )
-        } catch (e) {}
+        } catch (e) { }
         setAuthModalOpen(true)
         return
       }
@@ -1700,7 +1700,11 @@ function TasteProfile() {
           )}
         </BottomHint>
         <BtnRow>
-          {step > 1 && <BackBtn onClick={() => setStep(step - 1)}>← back</BackBtn>}
+          {step > 1 ? (
+            <BackBtn onClick={() => setStep(step - 1)}>← back</BackBtn>
+          ) : (
+            <BackBtn onClick={() => navigate('/')}>← back</BackBtn>
+          )}
           <NextBtn
             disabled={
               (step === 1 && !canStep2) ||

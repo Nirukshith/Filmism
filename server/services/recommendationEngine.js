@@ -123,15 +123,29 @@ async function generateRankedRecommendations(userProfile, options = {}) {
     console.warn('Failed to query RecommendationLog for candidate exclusion:', err.message);
   }
 
-  const existingExcludedIds = new Set([
+  const baseExcludedIds = new Set([
     ...(userProfile.favorites || []).map((f) => Number(f.tmdbId)),
     ...loggedTmdbIds,
   ]);
 
+  // Identifying Movies Currently on Screen (To avoid recommending them again)
+  const previousListIds = new Set(
+    (userProfile.cachedRecommendations || []).map((r) => Number(r.id || r.tmdbId)).filter(Boolean)
+  );
+  // Also block movies that were recommended in the previous session
+  const seenIds = new Set(
+    (userProfile.seenRecommendationIds || []).map(Number).filter(Boolean)
+  );
+
+  // Refresh is true only when the user explicitly clicks "See More" or "Retry"
+  const activeExcludedIds = forceRefresh
+    ? new Set([...baseExcludedIds, ...previousListIds, ...seenIds])
+    : baseExcludedIds;
+
   // 0. Cache Hit Check: Return cached recommendations filtered against excluded items
   const isCacheFresh = userProfile.cachedRecommendationsAt && (Date.now() - new Date(userProfile.cachedRecommendationsAt).getTime() < 3600000 * 4); // 4 hours
   if (!forceRefresh && isCacheFresh && Array.isArray(userProfile.cachedRecommendations) && userProfile.cachedRecommendations.length > 0) {
-    const filteredCached = userProfile.cachedRecommendations.filter((r) => !existingExcludedIds.has(Number(r.id || r.tmdbId)));
+    const filteredCached = userProfile.cachedRecommendations.filter((r) => !baseExcludedIds.has(Number(r.id || r.tmdbId)));
     const startIndex = (page - 1) * limit;
     const pagedList = filteredCached.slice(startIndex, startIndex + limit);
     pagedList.page = page;
@@ -142,25 +156,39 @@ async function generateRankedRecommendations(userProfile, options = {}) {
   }
 
   // 1. Fetch Candidate Pool proportionally across ALL clusters
-  const perClusterTarget = Math.max(16, Math.ceil(limit / clusters.length) + 8);
+  const perClusterTarget = Math.max(10, Math.ceil(limit / clusters.length) + 4);
   const candidateLists = await Promise.all(
-    clusters.map((c) => candidatePoolService.fetchCandidatesForCluster(c, userProfile, perClusterTarget))
+    clusters.map((c) =>
+      candidatePoolService.fetchCandidatesForCluster(c, userProfile, perClusterTarget, {
+        refresh: forceRefresh,
+        excludedIds: activeExcludedIds,
+      })
+    )
   );
 
   const allCandidates = candidateLists.flat();
 
-  // Deduplicate candidates and ensure none of the excluded (favorites, watched, watchlisted) are included
+  // Deduplicate candidates and ensure none of the excluded (favorites, watched, watchlisted, previous list) are included
   const uniqueCandidateMap = new Map();
   allCandidates.forEach((m) => {
-    if (!existingExcludedIds.has(Number(m.tmdbId))) {
+    if (!activeExcludedIds.has(Number(m.tmdbId))) {
       uniqueCandidateMap.set(Number(m.tmdbId), m);
     }
   });
 
+  // Fallback: If strict exclusion left too few candidates, allow seen items but strictly exclude base (favorites, watched, watchlisted) and previous list
+  if (uniqueCandidateMap.size < limit) {
+    allCandidates.forEach((m) => {
+      if (!baseExcludedIds.has(Number(m.tmdbId)) && !previousListIds.has(Number(m.tmdbId))) {
+        uniqueCandidateMap.set(Number(m.tmdbId), m);
+      }
+    });
+  }
+
   // Also include top semantic matches from MongoDB MovieProfile collection
   try {
     const cachedCandidates = await MovieProfile.find({
-      tmdbId: { $nin: Array.from(existingExcludedIds) },
+      tmdbId: { $nin: Array.from(activeExcludedIds) },
       'embedding.0': { $exists: true },
     }).lean();
 
@@ -257,17 +285,10 @@ async function generateRankedRecommendations(userProfile, options = {}) {
   let addedAny = true;
   let round = 0;
 
-  // On forceRefresh: shuffle top half of each bucket so results vary
-  // Keep deterministic sort on normal load so cached replay is consistent
+  // On forceRefresh: shuffle candidate buckets so all new recommendations have fresh variety
   if (forceRefresh) {
     Object.keys(clusterBuckets).forEach((cId) => {
-      const bucket = clusterBuckets[cId];
-      if (bucket.length > 1) {
-        // Preserve the very top film, shuffle the rest
-        const top = bucket.slice(0, 1);
-        const rest = shuffleArray(bucket.slice(1));
-        clusterBuckets[cId] = [...top, ...rest];
-      }
+      clusterBuckets[cId] = shuffleArray(clusterBuckets[cId]);
     });
   }
 
@@ -283,13 +304,17 @@ async function generateRankedRecommendations(userProfile, options = {}) {
     round++;
   }
 
-  // Save generated recommendations to userProfile cache asynchronously
+  // Save generated recommendations to userProfile cache & update seen list asynchronously
   if (userProfile._id && diverseRecommendations.length > 0) {
+    const newlyShownIds = diverseRecommendations.map((r) => Number(r.id || r.tmdbId)).filter(Boolean);
+    const updatedSeen = Array.from(new Set([...Array.from(seenIds), ...newlyShownIds])).slice(-150);
+
     UserTasteProfile.updateOne(
       { _id: userProfile._id },
       {
         cachedRecommendations: diverseRecommendations,
         cachedRecommendationsAt: new Date(),
+        seenRecommendationIds: updatedSeen,
       }
     ).catch(() => { });
   }

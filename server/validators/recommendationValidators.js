@@ -27,7 +27,7 @@ const recordActionSchema = z.object({
   title: z.string().max(250).optional(),
   sourceClusterId: z.string().max(100).optional(),
   sourceClusterName: z.string().max(200).optional(),
-  matchScore: z.coerce.number().min(0).max(1).optional(),
+  matchScore: z.coerce.number().min(0).max(100).optional(),
   sessionId: z.string().max(100).optional(),
 });
 

@@ -12,15 +12,17 @@ const initializeTasteProfile = async (req, res, next) => {
     const { genres = [], origins = [], favorites = [], sessionId } = req.body;
     const userId = req.user?._id || req.user?.id;
 
+    // Validation check
     if (!Array.isArray(favorites) || favorites.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Please provide at least 1 favorite film (5+ recommended for multi-cluster analysis).',
       });
     }
-
+    // Determine Guest vs Registered User
     const effectiveSessionId = !userId ? (sessionId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`) : undefined;
 
+    // Build taste profile from favorites
     const result = await tasteClusterService.buildTasteProfileFromFavorites({
       userId,
       sessionId: effectiveSessionId,
@@ -29,10 +31,12 @@ const initializeTasteProfile = async (req, res, next) => {
       favorites,
     });
 
+    // Update JWT Token for logged-in users (marks tasteProfileComplete: true)
     const updatedToken = userId
       ? jwt.sign({ id: userId, tasteProfileComplete: true }, process.env.JWT_SECRET, { expiresIn: '7d' })
       : undefined;
 
+    // Set cookie for guest users (for state preservation across requests)
     if (updatedToken) {
       res.cookie('token', updatedToken, {
         httpOnly: true,
@@ -43,6 +47,7 @@ const initializeTasteProfile = async (req, res, next) => {
       });
     }
 
+    // Return the newly created profile, clusters, and AI explanation
     res.json({
       success: true,
       sessionId: effectiveSessionId,
@@ -66,6 +71,7 @@ const getUserTasteProfile = async (req, res, next) => {
     const userId = req.user?._id || req.user?.id;
     const sessionId = req.query.sessionId;
 
+    // Checks whether the request comes from an authenticated user (userId) or guest (sessionId).
     if (!userId && !sessionId) {
       return res.status(400).json({
         success: false,
@@ -73,6 +79,7 @@ const getUserTasteProfile = async (req, res, next) => {
       });
     }
 
+    // Finds the corresponding UserTasteProfile document in MongoDB.
     const query = userId ? { userId } : { sessionId };
     const profile = await UserTasteProfile.findOne(query);
 
@@ -169,6 +176,7 @@ const appendTasteProfileFavorites = async (req, res, next) => {
     const { favorites = [], sessionId } = req.body;
     const userId = req.user?._id || req.user?.id;
 
+    //Input validation
     if (!Array.isArray(favorites) || favorites.length === 0) {
       return res.status(400).json({
         success: false,
@@ -176,8 +184,11 @@ const appendTasteProfileFavorites = async (req, res, next) => {
       });
     }
 
+
+    // Determine Guest vs Registered User
     const effectiveSessionId = !userId ? (sessionId || `guest_${Date.now()}`) : undefined;
 
+    // Updates the existing taste profile by incorporating the new favorite films.
     const result = await tasteClusterService.appendFavoritesToTasteProfile({
       userId,
       sessionId: effectiveSessionId,

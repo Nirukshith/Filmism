@@ -9,10 +9,15 @@ const {
 } = require('../controllers/tasteProfileController');
 const { optionalProtect } = require('../middleware/authMiddleware');
 
-// Rate limiter for AI taste profile generation
+// Rate limiter for AI taste profile generation (tracked per user / guest session / IP)
 const tasteProfileLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20, // max 20 profile builds/updates per window
+  keyGenerator: (req) => {
+    if (req.user?._id) return req.user._id.toString();
+    if (req.headers['x-session-id']) return String(req.headers['x-session-id']);
+    return req.ip || '127.0.0.1';
+  },
   standardHeaders: true,
   legacyHeaders: false,
   message: {

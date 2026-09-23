@@ -745,7 +745,9 @@ function Recommendations() {
         matchScore: movie.match,
         action: isCurrentlyWatchlisted ? 'shown' : 'watchlisted',
       })
-    } catch (e) { }
+    } catch (e) {
+      console.warn('Failed to record watchlist action:', e.message)
+    }
   }
 
   const handleDismiss = async (movie) => {
@@ -760,7 +762,9 @@ function Recommendations() {
         sourceClusterId: movie.sourceClusterId,
         action: 'dismissed',
       })
-    } catch (e) { }
+    } catch (e) {
+      console.warn('Failed to record dismiss action:', e.message)
+    }
   }
 
   const handleOpenWatchedModal = (movie) => {

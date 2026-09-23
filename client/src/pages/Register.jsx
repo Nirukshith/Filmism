@@ -373,6 +373,8 @@ function RegisterPage() {
       newErrors.password = 'min 8 characters'
     } else if (!/[A-Z]/.test(form.password)) {
       newErrors.password = 'must contain 1 uppercase letter'
+    } else if (!/\d/.test(form.password)) {
+      newErrors.password = 'must contain 1 number'
     } else if (!/[^A-Za-z0-9]/.test(form.password)) {
       newErrors.password = 'must contain 1 special character'
     }

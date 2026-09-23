@@ -139,6 +139,39 @@ describe('Auth Validators', () => {
       const parsed = registerSchema.safeParse(payload);
       expect(parsed.success).toBe(false);
     });
+
+    it('should reject passwords missing a number', () => {
+      const payload = {
+        firstName: 'First',
+        lastName: 'Last',
+        email: 'valid@filmism.app',
+        password: 'Password!',
+      };
+      const parsed = registerSchema.safeParse(payload);
+      expect(parsed.success).toBe(false);
+    });
+
+    it('should reject passwords missing an uppercase letter', () => {
+      const payload = {
+        firstName: 'First',
+        lastName: 'Last',
+        email: 'valid@filmism.app',
+        password: 'password123!',
+      };
+      const parsed = registerSchema.safeParse(payload);
+      expect(parsed.success).toBe(false);
+    });
+
+    it('should reject passwords missing a special character', () => {
+      const payload = {
+        firstName: 'First',
+        lastName: 'Last',
+        email: 'valid@filmism.app',
+        password: 'Password123',
+      };
+      const parsed = registerSchema.safeParse(payload);
+      expect(parsed.success).toBe(false);
+    });
   });
 
   describe('loginSchema', () => {
@@ -186,6 +219,9 @@ describe('Recommendation Validators', () => {
   it('should validate recordActionSchema and enforce valid action types', () => {
     const valid = { tmdbId: 603, action: 'watchlisted', matchScore: 0.92 };
     expect(recordActionSchema.safeParse(valid).success).toBe(true);
+
+    const validPercentage = { tmdbId: 603, action: 'watchlisted', matchScore: 96 };
+    expect(recordActionSchema.safeParse(validPercentage).success).toBe(true);
 
     const invalid = { tmdbId: 603, action: 'invalid_action_type' };
     expect(recordActionSchema.safeParse(invalid).success).toBe(false);

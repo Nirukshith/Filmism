@@ -1,7 +1,7 @@
 const { z } = require('zod');
 
-// Strong password regex: at least 8 chars, 1 uppercase, 1 special character
-const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,100}$/;
+// Strong password regex: at least 8 chars, 1 uppercase, 1 number, 1 special character
+const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,100}$/;
 
 const registerSchema = z.object({
   firstName: z
@@ -26,7 +26,7 @@ const registerSchema = z.object({
     .max(100, 'Password must be under 100 characters')
     .regex(
       PASSWORD_REGEX,
-      'Password must contain at least one uppercase letter and one special character.'
+      'Password must contain at least one uppercase letter, one number, and one special character.'
     ),
 });
 
@@ -80,7 +80,7 @@ const updateProfileSchema = z.object({
     .max(100)
     .regex(
       PASSWORD_REGEX,
-      'New password must contain at least one uppercase letter and one special character.'
+      'New password must contain at least one uppercase letter, one number, and one special character.'
     )
     .optional(),
   profilePicture: z

@@ -101,6 +101,10 @@ const userTasteProfileSchema = new mongoose.Schema(
     cachedRecommendationsAt: {
       type: Date,
     },
+    seenRecommendationIds: {
+      type: [Number],
+      default: [],
+    },
     matchingEnabled: {
       type: Boolean,
       default: false,

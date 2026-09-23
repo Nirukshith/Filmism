@@ -6,13 +6,11 @@ const blockSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'blocker userId is required'],
-      index: true,
     },
     blocked: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'blocked userId is required'],
-      index: true,
     },
     reason: {
       type: String,

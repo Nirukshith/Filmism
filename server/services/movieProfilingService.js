@@ -129,9 +129,6 @@ async function getOrProfileMovie(tmdbId, forceReProfile = false, fastMode = true
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
-    // Queue deep AI enrichment in background without blocking
-    enrichMovieWithAiBackground(numericId, rawData);
-
     return { profile: savedProfile, fromCache: false };
   }
 
@@ -250,4 +247,5 @@ module.exports = {
   getOrProfileMovie,
   batchGetOrProfileMovies,
   findSimilarProfiledMovies,
+  enrichMovieWithAiBackground,
 };

@@ -17,7 +17,6 @@ export function TasteProvider({ children }) {
 
   const [ratings, setRatings]                 = useState({})
   const [watchlist, setWatchlist]             = useState([])
-  const [haventSeen, setHaventSeen]           = useState([])
   const [aestheticProfile, setAestheticProfile] = useState(null)
 
   // Save guest sessionId
@@ -265,7 +264,6 @@ export function TasteProvider({ children }) {
     setAiSynthesis('')
     setRatings({})
     setWatchlist([])
-    setHaventSeen([])
     setAestheticProfile(null)
     localStorage.removeItem('filmism_taste_clusters')
     localStorage.removeItem('filmism_ai_synthesis')
@@ -292,8 +290,6 @@ export function TasteProvider({ children }) {
         setRatings,
         watchlist,
         setWatchlist,
-        haventSeen,
-        setHaventSeen,
         aestheticProfile,
         setAestheticProfile,
         initializeProfile,
