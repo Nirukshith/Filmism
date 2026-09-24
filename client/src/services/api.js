@@ -28,7 +28,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const isAuthRoute = error.config?.url?.includes('/auth/')
-    if (error.response?.status === 401 && !isAuthRoute) {
+    const isNotificationRoute = error.config?.url?.includes('/notifications')
+    const hadToken = !!localStorage.getItem('token')
+
+    // Only redirect to login if user had a token and this wasn't an auth/notification endpoint
+    if (error.response?.status === 401 && !isAuthRoute && !isNotificationRoute && hadToken) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       localStorage.removeItem('filmism_taste_clusters')
