@@ -1,11 +1,11 @@
 const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const mongoose = require('mongoose');
-const movieProfilingService = require('./services/movieProfilingService');
-const aiService = require('./services/aiService');
-const vectorService = require('./services/vectorService');
+const movieProfilingService = require('../services/movieProfilingService');
+const aiService = require('../services/aiService');
+const vectorService = require('../services/vectorService');
 
 async function test() {
   console.log('\n======================================================');

@@ -9,10 +9,10 @@
     "test:unit": "jest tests/unit --verbose",
     "test:integration": "jest tests/integration --verbose",
     "test:coverage": "jest --coverage",
-    "test:profiling": "node test_profile.js",
-    "test:clustering": "node test_clustering.js",
-    "test:recommendations": "node test_recommendations.js",
-    "test:telemetry": "node test_telemetry.js",
+    "test:profiling": "node scripts/test_profile.js",
+    "test:clustering": "node scripts/test_clustering.js",
+    "test:recommendations": "node scripts/test_recommendations.js",
+    "test:telemetry": "node scripts/test_telemetry.js",
     "seed:admin": "node scripts/seedAdmin.js"
   },
   "dependencies": {

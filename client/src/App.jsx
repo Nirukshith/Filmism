@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Landing from './pages/landing'
+import Landing from './pages/Landing'
 import TasteProfile from './pages/TasteProfile'
 import Recommendations from './pages/Recommendations'
 import Watchlist from './pages/Watchlist'

@@ -1,11 +1,11 @@
 const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const mongoose = require('mongoose');
-const tasteClusterService = require('./services/tasteClusterService');
-const candidatePoolService = require('./services/candidatePoolService');
-const recommendationEngine = require('./services/recommendationEngine');
+const tasteClusterService = require('../services/tasteClusterService');
+const candidatePoolService = require('../services/candidatePoolService');
+const recommendationEngine = require('../services/recommendationEngine');
 
 async function testRecommendations() {
   console.log('\n======================================================');
