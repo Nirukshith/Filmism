@@ -18,6 +18,7 @@ const tasteProfileLimiter = rateLimit({
     if (req.headers['x-session-id']) return String(req.headers['x-session-id']);
     return req.ip || '127.0.0.1';
   },
+  validate: { keyGeneratorIpFallback: false },
   standardHeaders: true,
   legacyHeaders: false,
   message: {
