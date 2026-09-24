@@ -302,10 +302,22 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [hasToken, setHasToken] = useState(() => !!localStorage.getItem('token'))
   const ref = useRef(null)
   const navigate = useNavigate()
 
+  useEffect(() => {
+    const handleAuth = () => setHasToken(!!localStorage.getItem('token'))
+    window.addEventListener('storage', handleAuth)
+    window.addEventListener('filmism_auth_update', handleAuth)
+    return () => {
+      window.removeEventListener('storage', handleAuth)
+      window.removeEventListener('filmism_auth_update', handleAuth)
+    }
+  }, [])
+
   const fetchUnreadCount = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
     try {
       const res = await notificationAPI.getUnreadCount()
       if (res.data?.success) {
@@ -315,6 +327,7 @@ export default function NotificationBell() {
   }, [])
 
   const fetchNotifications = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
     setLoading(true)
     try {
       const res = await notificationAPI.getNotifications({ limit: 20 })
@@ -334,6 +347,7 @@ export default function NotificationBell() {
 
   // Poll unread count every 12 seconds & listen to real-time read sync events
   useEffect(() => {
+    if (!hasToken) return
     fetchUnreadCount()
     const interval = setInterval(fetchUnreadCount, 12000)
 
