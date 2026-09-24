@@ -1,11 +1,11 @@
 const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const mongoose = require('mongoose');
-const tasteClusterService = require('./services/tasteClusterService');
-const feedbackService = require('./services/feedbackService');
-const RecommendationLog = require('./models/recommendationLogModel');
+const tasteClusterService = require('../services/tasteClusterService');
+const feedbackService = require('../services/feedbackService');
+const RecommendationLog = require('../models/recommendationLogModel');
 
 async function testTelemetryAndOutcome() {
   console.log('\n======================================================');
