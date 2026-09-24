@@ -14,12 +14,14 @@ const generateToken = (id, tasteProfileComplete = false) => {
 // Dummy hash for constant-time password comparison to prevent timing attacks
 const DUMMY_HASH = '$2a$10$e8wF3Qv1mR0x9wGqjM1G4.K5d1K3k5k5k5k5k5k5k5k5k5k5k5k5k'
 
-// Helper to set secure httpOnly cookie on response
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Helper to set secure httpOnly cookie on response (supports cross-origin in production)
 const sendTokenCookie = (res, token) => {
   res.cookie('token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
   })
@@ -253,6 +255,12 @@ const loginUser = async (req, res, next) => {
 
     const token = generateToken(user._id, user.tasteProfileComplete)
     sendTokenCookie(res, token)
+
+    // Flag taste profile for smart cache rotation on next dashboard visit
+    UserTasteProfile.updateOne(
+      { userId: user._id },
+      { $set: { needsCacheRotation: true } }
+    ).catch(() => {})
 
     res.json({
       _id:       user._id,
@@ -524,8 +532,8 @@ const resetTasteProfile = async (req, res, next) => {
 const logoutUser = (req, res) => {
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
     path: '/',
   })
   res.json({ success: true, message: 'Logged out successfully' })

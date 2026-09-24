@@ -9,6 +9,7 @@ const {
   getTelemetryStats,
   getWatchlist,
   getDiary,
+  removeFromDiary,
 } = require('../controllers/recommendationController');
 const { optionalProtect } = require('../middleware/authMiddleware');
 
@@ -43,5 +44,8 @@ router.get('/watchlist', optionalProtect, getWatchlist);
 
 // GET /api/recommendations/diary (Guest + Authenticated)
 router.get('/diary', optionalProtect, getDiary);
+
+// DELETE /api/recommendations/diary/:tmdbId (Guest + Authenticated) - remove film and mark as unwatched
+router.delete('/diary/:tmdbId', optionalProtect, removeFromDiary);
 
 module.exports = router;

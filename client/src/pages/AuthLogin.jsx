@@ -417,7 +417,8 @@ function LoginPage() {
       if (response.data.token) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data))
-        localStorage.setItem('filmism_needs_refresh', 'true')  // force fresh matches on next dashboard load
+        localStorage.setItem('filmism_rotate_cache', 'true')  // rotate cached recommendations on login
+        localStorage.removeItem('filmism_needs_refresh')
         localStorage.setItem('filmism_is_returning_user', 'true')
         window.dispatchEvent(new Event('filmism_auth_update'))
       }

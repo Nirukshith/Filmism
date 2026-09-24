@@ -89,6 +89,22 @@ const CheckIcon = ({ size = 14 }) => (
   </svg>
 )
 
+const BookmarkIcon = ({ filled = false, size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={filled ? '#ff751f' : 'none'}
+    stroke={filled ? '#ff751f' : 'currentColor'}
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0, transition: 'all 0.15s ease' }}
+  >
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+  </svg>
+)
+
 // ─── Styled Components ────────────────────────────────────────────────────────
 
 const PageWrapper = styled.main`
@@ -187,7 +203,7 @@ const RefreshBtn = styled.button`
   background: #111;
   color: #fff;
   border: 1px solid #111;
-  border-radius: 999px;
+  border-radius: 6px;
   padding: 0.55rem 1.15rem;
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.8rem;
@@ -322,7 +338,7 @@ const ConnectActionBtn = styled.button`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.78rem;
   font-weight: 700;
-  border-radius: 999px;
+  border-radius: 6px;
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -652,11 +668,11 @@ const WatchlistBtn = styled.button`
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  background: ${({ $saved }) => ($saved ? '#10b981' : '#111')};
+  background: #18181b;
   color: #fff;
-  border: none;
-  border-radius: 999px;
-  padding: 0.65rem 1.35rem;
+  border: 1px solid #18181b;
+  border-radius: 6px;
+  padding: 0.65rem 1.25rem;
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.82rem;
   font-weight: 600;
@@ -665,8 +681,10 @@ const WatchlistBtn = styled.button`
   white-space: nowrap;
 
   &:hover {
-    background: ${({ $saved }) => ($saved ? '#059669' : '#ff751f')};
+    background: ${({ $saved }) => ($saved ? '#27272a' : '#ff751f')};
+    border-color: ${({ $saved }) => ($saved ? '#27272a' : '#ff751f')};
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 `
 
@@ -681,10 +699,10 @@ const AlreadyWatchedBtn = styled.button`
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  background: #f0f0f0;
+  background: #f4f4f6;
   color: #333;
-  border: 1px solid #ddd;
-  border-radius: 999px;
+  border: 1px solid #e2e2e5;
+  border-radius: 6px;
   padding: 0.65rem 1.25rem;
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.82rem;
@@ -694,10 +712,11 @@ const AlreadyWatchedBtn = styled.button`
   white-space: nowrap;
 
   &:hover:not(:disabled) {
-    background: #e4e4e4;
-    border-color: #bbb;
+    background: #eaebee;
+    border-color: #d2d3d8;
     color: #111;
     transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   }
 
   &:disabled {
@@ -764,7 +783,7 @@ const PrimaryActionBtn = styled.button`
   background: #ff751f;
   color: #fff;
   border: none;
-  border-radius: 999px;
+  border-radius: 6px;
   padding: 0.75rem 1.75rem;
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.88rem;
@@ -1310,11 +1329,11 @@ export default function CinephileTwin() {
                     >
                       {watchlistedDiscovery ? (
                         <>
-                          <CheckIcon size={14} /> Saved to Watchlist
+                          <BookmarkIcon filled size={14} /> Saved to Watchlist
                         </>
                       ) : (
                         <>
-                          <PlusIcon size={14} /> Save to Watchlist
+                          <BookmarkIcon size={14} /> Save to Watchlist
                         </>
                       )}
                     </WatchlistBtn>

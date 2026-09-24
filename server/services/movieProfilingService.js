@@ -182,10 +182,11 @@ async function batchGetOrProfileMovies(tmdbIds, concurrency = 8) {
 
   const missingIds = uniqueIds.filter((id) => !profileMap.has(id));
 
-  // 2. Profile missing films concurrently in fast mode
+  // 2. Profile missing films concurrently in fast mode (capped at 8 to prevent TMDB network congestion)
   if (missingIds.length > 0) {
-    for (let i = 0; i < missingIds.length; i += concurrency) {
-      const chunk = missingIds.slice(i, i + concurrency);
+    const idsToProfile = missingIds.slice(0, 8);
+    for (let i = 0; i < idsToProfile.length; i += concurrency) {
+      const chunk = idsToProfile.slice(i, i + concurrency);
       const results = await Promise.allSettled(
         chunk.map((id) => getOrProfileMovie(id, false, true))
       );

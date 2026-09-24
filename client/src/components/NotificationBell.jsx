@@ -319,7 +319,11 @@ export default function NotificationBell() {
     try {
       const res = await notificationAPI.getNotifications({ limit: 20 })
       if (res.data?.success) {
-        setNotifications(res.data.notifications || [])
+        // Dismiss already-read message notifications so they never linger once seen
+        const list = (res.data.notifications || []).filter(
+          (n) => !(n.type === 'new_message' && n.isRead)
+        )
+        setNotifications(list)
         setUnreadCount(res.data.unreadCount || 0)
       }
     } catch (e) {
@@ -328,19 +332,26 @@ export default function NotificationBell() {
     }
   }, [])
 
-  // Poll unread count every 12 seconds
+  // Poll unread count every 12 seconds & listen to real-time read sync events
   useEffect(() => {
     fetchUnreadCount()
     const interval = setInterval(fetchUnreadCount, 12000)
 
     const handleFocus = () => fetchUnreadCount()
+    const handleSync = () => {
+      fetchUnreadCount()
+      if (open) fetchNotifications()
+    }
+
     window.addEventListener('focus', handleFocus)
+    window.addEventListener('filmism_notifications_updated', handleSync)
 
     return () => {
       clearInterval(interval)
       window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('filmism_notifications_updated', handleSync)
     }
-  }, [fetchUnreadCount])
+  }, [fetchUnreadCount, fetchNotifications, open])
 
   // Open dropdown & fetch notifications list
   const handleToggle = () => {
@@ -363,8 +374,11 @@ export default function NotificationBell() {
   const handleMarkAllRead = async () => {
     try {
       await notificationAPI.markAllRead()
+      // Message notifications are completely dismissed once read; persistent alerts stay marked read
       setNotifications((prev) =>
-        prev.map((n) => ({ ...n, isRead: true, readAt: new Date() }))
+        prev
+          .filter((n) => n.type !== 'new_message')
+          .map((n) => ({ ...n, isRead: true, readAt: new Date() }))
       )
       setUnreadCount(0)
     } catch (e) {}
@@ -376,14 +390,18 @@ export default function NotificationBell() {
       try {
         await notificationAPI.markRead(notif.notificationId)
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.notificationId === notif.notificationId
-              ? { ...n, isRead: true, readAt: new Date() }
-              : n
-          )
+          prev
+            .filter((n) => !(n.notificationId === notif.notificationId && n.type === 'new_message'))
+            .map((n) =>
+              n.notificationId === notif.notificationId
+                ? { ...n, isRead: true, readAt: new Date() }
+                : n
+            )
         )
         setUnreadCount((c) => Math.max(0, c - 1))
       } catch (e) {}
+    } else if (notif.type === 'new_message') {
+      setNotifications((prev) => prev.filter((n) => n.notificationId !== notif.notificationId))
     }
 
     setOpen(false)
@@ -392,7 +410,7 @@ export default function NotificationBell() {
     if (notif.type === 'new_message' || notif.type === 'connection_accepted') {
       const convId = notif.data?.conversationId
       if (convId) {
-        navigate(`/messages?conv=${convId}`)
+        navigate(`/messages?conversationId=${convId}`)
       } else {
         navigate('/messages')
       }

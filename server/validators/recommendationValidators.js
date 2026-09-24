@@ -16,6 +16,7 @@ const rankedRecommendationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(12).optional(),
   refresh: z.preprocess((val) => val === 'true' || val === true, z.boolean()).optional(),
   forceRefresh: z.preprocess((val) => val === 'true' || val === true, z.boolean()).optional(),
+  rotate: z.preprocess((val) => val === 'true' || val === true, z.boolean()).optional(),
   sessionId: z.string().max(100).optional(),
 });
 

@@ -3,6 +3,8 @@ import styled, { keyframes } from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import UserAvatar from '../components/UserAvatar'
+import PostWatchModal from '../components/PostWatchModal'
+import { useTasteProfile } from '../hooks/useTasteProfile'
 
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w342'
 
@@ -128,7 +130,7 @@ const EmptyLink = styled(Link)`
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 1.1rem;
 
   @media (max-width: 480px) {
@@ -207,46 +209,101 @@ const CardBody = styled.div`
 
 const CardTitle = styled.p`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
   color: #111;
-  margin: 0 0 2px;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  margin: 0 0 4px;
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: break-word;
 `
 
 const CardMeta = styled.p`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.65rem;
-  color: #999;
+  color: #888;
   margin: 0 0 auto;
+  line-height: 1.3;
+  word-break: break-word;
 `
 
 const CardCluster = styled.p`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.62rem;
   color: #ff751f;
-  margin: 0.4rem 0 0.55rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0.35rem 0 0.5rem;
+  line-height: 1.3;
+  word-break: break-word;
+`
+
+const CardActions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.65rem;
+  width: 100%;
+`
+
+const EyeIcon = ({ size = 13 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0 }}
+  >
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const MarkWatchedBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  background: #ff751f;
+  border: 1px solid #ff751f;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+
+  &:hover {
+    background: #e6600c;
+    border-color: #e6600c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 117, 31, 0.25);
+  }
 `
 
 const RemoveBtn = styled.button`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.65rem;
-  color: #aaa;
-  background: none;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 3px 8px;
+  font-size: 0.68rem;
+  color: #888;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  align-self: flex-start;
-  &:hover { color: #c0392b; border-color: #c0392b; }
+  transition: color 0.15s, background 0.15s;
+  width: 100%;
+  text-align: center;
+  border-radius: 4px;
+
+  &:hover {
+    color: #c0392b;
+    background: rgba(192, 57, 43, 0.06);
+  }
 `
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -254,7 +311,9 @@ const RemoveBtn = styled.button`
 function Watchlist() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeModalMovie, setActiveModalMovie] = useState(null)
   const navigate = useNavigate()
+  const { removeMovieFromDashboard, updateWatchedOutcomes, cachedWatchedOutcomes } = useTasteProfile()
 
   useEffect(() => {
     const sessionId = localStorage.getItem('filmism_session_id') || undefined
@@ -278,75 +337,115 @@ function Watchlist() {
     }
   }
 
+  const handleSubmitOutcome = async (movie, outcomeRating) => {
+    const movieId = Number(movie.id || movie.tmdbId)
+    // Immediately remove from Watchlist UI
+    setItems((prev) => prev.filter((f) => Number(f.tmdbId || f.id) !== movieId))
+    if (removeMovieFromDashboard) {
+      removeMovieFromDashboard(movieId)
+    }
+    if (updateWatchedOutcomes) {
+      updateWatchedOutcomes({ ...(cachedWatchedOutcomes || {}), [movieId]: outcomeRating })
+    }
+    setActiveModalMovie(null)
+
+    try {
+      const sessionId = localStorage.getItem('filmism_session_id') || undefined
+      await api.post('/recommendations/outcome', {
+        sessionId,
+        tmdbId: movieId,
+        outcomeRating,
+        sourceClusterId: movie.sourceClusterId,
+      })
+    } catch (e) {
+      console.warn('Failed to record outcome:', e.message)
+    }
+  }
+
   return (
-    <PageWrapper>
-      <Topbar>
-        <Logo>Filmism</Logo>
-        <TopbarRight>
-          <UserAvatar />
-        </TopbarRight>
-      </Topbar>
+    <>
+      {activeModalMovie && (
+        <PostWatchModal
+          movie={activeModalMovie}
+          onClose={() => setActiveModalMovie(null)}
+          onSubmit={handleSubmitOutcome}
+        />
+      )}
 
-      <PageBody>
-        <PageHeader>
-          <div>
-            <PageTitle>watchlist</PageTitle>
-            {!loading && (
-              <PageCount>
-                {items.length === 0
-                  ? 'no films saved yet'
-                  : `${items.length} film${items.length !== 1 ? 's' : ''} saved`}
-              </PageCount>
-            )}
-          </div>
-        </PageHeader>
+      <PageWrapper>
+        <Topbar>
+          <Logo>Filmism</Logo>
+          <TopbarRight>
+            <UserAvatar />
+          </TopbarRight>
+        </Topbar>
 
-        {loading ? (
-          <LoadingText>loading your watchlist...</LoadingText>
-        ) : items.length === 0 ? (
-          <EmptyState>
-            <EmptyTitle>your watchlist is empty.</EmptyTitle>
-            <EmptySub>
-              Head to recommendations and save films you want to watch.
-            </EmptySub>
-            <EmptyLink to="/recommend">browse recommendations →</EmptyLink>
-          </EmptyState>
-        ) : (
-          <Grid>
-            {items.map((film, i) => (
-              <Card key={film.tmdbId} $i={i}>
-                <PosterWrap>
-                  {film.poster_path ? (
-                    <Poster
-                      src={`${TMDB_IMG}${film.poster_path}`}
-                      alt={film.title}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <PosterFallback>{film.title}</PosterFallback>
-                  )}
-                  {film.matchScore > 0 && (
-                    <ScoreBadge $score={film.matchScore}>{film.matchScore}%</ScoreBadge>
-                  )}
-                </PosterWrap>
-                <CardBody>
-                  <CardTitle>{film.title}</CardTitle>
-                  <CardMeta>
-                    {[film.year, ...(film.genres || [])].filter(Boolean).join(' · ')}
-                  </CardMeta>
-                  {film.sourceClusterName && (
-                    <CardCluster>{film.sourceClusterName}</CardCluster>
-                  )}
-                  <RemoveBtn onClick={() => handleRemove(film.tmdbId)}>
-                    remove
-                  </RemoveBtn>
-                </CardBody>
-              </Card>
-            ))}
-          </Grid>
-        )}
-      </PageBody>
-    </PageWrapper>
+        <PageBody>
+          <PageHeader>
+            <div>
+              <PageTitle>watchlist</PageTitle>
+              {!loading && (
+                <PageCount>
+                  {items.length === 0
+                    ? 'no films saved yet'
+                    : `${items.length} film${items.length !== 1 ? 's' : ''} saved`}
+                </PageCount>
+              )}
+            </div>
+          </PageHeader>
+
+          {loading ? (
+            <LoadingText>loading your watchlist...</LoadingText>
+          ) : items.length === 0 ? (
+            <EmptyState>
+              <EmptyTitle>your watchlist is empty.</EmptyTitle>
+              <EmptySub>
+                Head to recommendations and save films you want to watch.
+              </EmptySub>
+              <EmptyLink to="/recommend">browse recommendations →</EmptyLink>
+            </EmptyState>
+          ) : (
+            <Grid>
+              {items.map((film, i) => (
+                <Card key={film.tmdbId} $i={i}>
+                  <PosterWrap>
+                    {film.poster_path ? (
+                      <Poster
+                        src={`${TMDB_IMG}${film.poster_path}`}
+                        alt={film.title}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <PosterFallback>{film.title}</PosterFallback>
+                    )}
+                    {film.matchScore > 0 && (
+                      <ScoreBadge $score={film.matchScore}>{film.matchScore}%</ScoreBadge>
+                    )}
+                  </PosterWrap>
+                  <CardBody>
+                    <CardTitle title={film.title}>{film.title}</CardTitle>
+                    <CardMeta>
+                      {[film.year, ...(film.genres || [])].filter(Boolean).join(' · ')}
+                    </CardMeta>
+                    {film.sourceClusterName && (
+                      <CardCluster>{film.sourceClusterName}</CardCluster>
+                    )}
+                    <CardActions>
+                      <MarkWatchedBtn onClick={() => setActiveModalMovie(film)}>
+                        <EyeIcon size={13} /> Mark Watched
+                      </MarkWatchedBtn>
+                      <RemoveBtn onClick={() => handleRemove(film.tmdbId)}>
+                        remove
+                      </RemoveBtn>
+                    </CardActions>
+                  </CardBody>
+                </Card>
+              ))}
+            </Grid>
+          )}
+        </PageBody>
+      </PageWrapper>
+    </>
   )
 }
 

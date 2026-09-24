@@ -84,84 +84,308 @@ const scaleIn = keyframes`
 `
 
 const Grid = styled.div`
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.1rem;
-  @media (max-width: 480px) { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 0.85rem;
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.55rem;
+  }
 `
 const Card = styled.div`
-  background: #fff; border-radius: 10px; overflow: hidden; border: 1.5px solid #e8e8e8;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e5e5;
   transition: transform 0.2s, box-shadow 0.2s;
-  animation: ${fadeIn} 0.3s ease both; animation-delay: ${({ $i }) => $i * 0.03}s;
-  display: flex; flex-direction: column;
+  animation: ${fadeIn} 0.25s ease both;
+  animation-delay: ${({ $i }) => Math.min($i * 0.02, 0.3)}s;
+  display: flex;
+  flex-direction: column;
   position: relative;
-  &:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
 `
 const PosterWrap = styled.div`
-  width: 100%; aspect-ratio: 2/3; background: #e0e0e0; position: relative; overflow: hidden;
+  width: 100%;
+  aspect-ratio: 2/3;
+  background: #e0e0e0;
+  position: relative;
+  overflow: hidden;
 `
 const Poster = styled.img`width: 100%; height: 100%; object-fit: cover; display: block;`
 const PosterFallback = styled.div`
-  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-  font-family: 'Lexend Deca', sans-serif; font-size: 0.7rem; color: #aaa; text-align: center; padding: 0.5rem;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.65rem;
+  color: #aaa;
+  text-align: center;
+  padding: 0.4rem;
 `
 
 const ReviewPillBtn = styled.button`
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
+  justify-content: center;
+  gap: 3px;
+  padding: 3px 5px;
   border-radius: 999px;
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.61rem;
   font-weight: 700;
   text-transform: lowercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   color: ${({ $color }) => $color};
   background: ${({ $bg }) => $bg};
-  border: 1.5px solid ${({ $color }) => $color}44;
-  margin-top: auto;
+  border: 1px solid ${({ $color }) => $color}44;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  flex: 1;
+  min-width: 0;
 
   &:hover {
     border-color: ${({ $color }) => $color};
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+
+  span.pill-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   span.edit-icon {
-    font-size: 0.65rem;
-    opacity: 0.7;
+    font-size: 0.58rem;
+    opacity: 0.65;
+    flex-shrink: 0;
   }
 `
 
 const CardBody = styled.div`
-  padding: 0.65rem 0.75rem 0.8rem;
+  padding: 0.45rem 0.55rem 0.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.18rem;
   flex: 1;
   text-align: center;
 `
 const CardTitle = styled.p`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: 0.76rem;
+  font-size: 0.69rem;
   font-weight: 700;
   color: #111;
   margin: 0;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.25;
+  word-break: break-word;
+  overflow-wrap: break-word;
 `
 const CardYear = styled.p`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.65rem;
-  color: #bbb;
+  font-size: 0.6rem;
+  color: #aaa;
   margin: 0;
   letter-spacing: 0.02em;
+`
+
+const CardActions = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 0.35rem;
+  width: 100%;
+`
+
+const RemoveBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.64rem;
+  color: #999;
+  background: transparent;
+  border: 1px solid transparent;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &:hover {
+    color: #e05353;
+    background: #fdf2f2;
+    border-color: rgba(224, 83, 83, 0.2);
+  }
+`
+
+const ModalRemoveBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.06);
+  border: 1px solid rgba(192, 57, 43, 0.2);
+  border-radius: 6px;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  margin-top: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  &:hover:not(:disabled) {
+    background: #c0392b;
+    color: #fff;
+    border-color: #c0392b;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(192, 57, 43, 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const ConfirmModalCard = styled.div`
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 1.6rem;
+  max-width: 420px;
+  width: 100%;
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  position: relative;
+  animation: ${scaleIn} 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`
+
+const ConfirmTitle = styled.h2`
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: 1.05rem;
+  color: #fff;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`
+
+const ConfirmBody = styled.p`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+  color: #a1a1aa;
+  margin: 0;
+  line-height: 1.5;
+
+  strong {
+    color: #fff;
+  }
+`
+
+const ConfirmFilmCard = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+`
+
+const ConfirmPoster = styled.img`
+  width: 42px;
+  height: 62px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #27272a;
+`
+
+const ConfirmFilmDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  overflow: hidden;
+`
+
+const ConfirmFilmTitle = styled.div`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const ConfirmFilmYear = styled.div`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.72rem;
+  color: #888;
+`
+
+const ConfirmButtonGroup = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+`
+
+const CancelBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #d4d4d8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+`
+
+const DeleteConfirmBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  border: none;
+  background: #c0392b;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  &:hover {
+    background: #e74c3c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(231, 76, 60, 0.35);
+  }
 `
 
 const FilterTabs = styled.div`
@@ -200,23 +424,23 @@ const FilterBtn = styled.button`
 
 const FavoriteBadge = styled.div`
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 6px;
+  left: 6px;
   background: rgba(17, 17, 17, 0.85);
   backdrop-filter: blur(4px);
   color: #ffb800;
   border: 1px solid rgba(255, 184, 0, 0.4);
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.62rem;
+  font-size: 0.55rem;
   font-weight: 700;
-  padding: 2px 7px;
+  padding: 1.5px 5px;
   border-radius: 999px;
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   letter-spacing: 0.02em;
   text-transform: lowercase;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   z-index: 2;
 `
 
@@ -418,15 +642,35 @@ function Diary() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // 'all' | 'favorites' | 'watched'
   const [editingFilm, setEditingFilm] = useState(null)
+  const [confirmDeleteFilm, setConfirmDeleteFilm] = useState(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
 
-  const { setTasteClusters, setAiSynthesis } = useTasteProfile()
+  const {
+    setTasteClusters,
+    setAiSynthesis,
+    removeMovieFromDashboard,
+    cachedWatchedOutcomes,
+    updateWatchedOutcomes,
+    cachedProfileRatings,
+    updateProfileRatings,
+  } = useTasteProfile()
 
   useEffect(() => {
     const sessionId = localStorage.getItem('filmism_session_id') || undefined
     api.get('/recommendations/diary', { params: { sessionId } })
-      .then((res) => setItems(res.data.diary || []))
+      .then((res) => {
+        const diaryList = res.data?.diary || []
+        setItems(diaryList)
+        if (updateWatchedOutcomes && diaryList.length > 0) {
+          const outcomes = { ...(cachedWatchedOutcomes || {}) }
+          diaryList.forEach((item) => {
+            const id = Number(item.tmdbId || item.id)
+            if (id) outcomes[id] = item.outcomeRating || 3
+          })
+          updateWatchedOutcomes(outcomes)
+        }
+      })
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
   }, [])
@@ -454,6 +698,14 @@ function Diary() {
           )
         )
 
+        // Immediately sync review graph metrics
+        if (updateWatchedOutcomes) {
+          updateWatchedOutcomes({ ...(cachedWatchedOutcomes || {}), [editingFilm.tmdbId]: tier.value })
+        }
+        if (updateProfileRatings) {
+          updateProfileRatings({ ...(cachedProfileRatings || {}), [editingFilm.tmdbId]: tier.value })
+        }
+
         // Sync recalculated taste clusters to context & storage
         if (response.data.clusters) {
           setTasteClusters(response.data.clusters)
@@ -475,6 +727,58 @@ function Diary() {
     } finally {
       setIsUpdating(false)
       setEditingFilm(null)
+    }
+  }
+
+  const handleConfirmRemove = async () => {
+    if (!confirmDeleteFilm) return
+    const film = confirmDeleteFilm
+    const tmdbId = Number(film.tmdbId)
+
+    // Optimistically remove from grid
+    setItems((prev) => prev.filter((item) => Number(item.tmdbId) !== tmdbId))
+    setConfirmDeleteFilm(null)
+
+    // Keep review graph cached counts synchronized immediately
+    if (updateWatchedOutcomes && cachedWatchedOutcomes) {
+      const nextOutcomes = { ...cachedWatchedOutcomes }
+      delete nextOutcomes[tmdbId]
+      updateWatchedOutcomes(nextOutcomes)
+    }
+    if (updateProfileRatings && cachedProfileRatings) {
+      const nextProfile = { ...cachedProfileRatings }
+      delete nextProfile[tmdbId]
+      updateProfileRatings(nextProfile)
+    }
+
+    try {
+      const sessionId = localStorage.getItem('filmism_session_id') || undefined
+      const response = await api.delete(`/recommendations/diary/${tmdbId}`, { params: { sessionId } })
+
+      // Sync recalculated taste clusters to context & storage if favorites were updated
+      if (response.data?.clusters) {
+        setTasteClusters(response.data.clusters)
+        localStorage.setItem('filmism_taste_clusters', JSON.stringify(response.data.clusters))
+      }
+      if (response.data?.aiSynthesis) {
+        setAiSynthesis(response.data.aiSynthesis)
+        localStorage.setItem('filmism_ai_synthesis', response.data.aiSynthesis)
+      }
+
+      if (removeMovieFromDashboard) {
+        removeMovieFromDashboard(tmdbId)
+      }
+
+      setToastMessage(
+        response.data?.clusters
+          ? `Removed "${film.title}" & re-calibrated taste vectors!`
+          : `Removed "${film.title}" from film logs & marked as unwatched.`
+      )
+      setTimeout(() => setToastMessage(''), 3500)
+    } catch (err) {
+      console.error('Failed to remove film from diary:', err)
+      setToastMessage('Failed to remove film. Please try again.')
+      setTimeout(() => setToastMessage(''), 3000)
     }
   }
 
@@ -550,19 +854,33 @@ function Diary() {
                     }
                   </PosterWrap>
                   <CardBody>
-                    <CardTitle>{film.title}</CardTitle>
+                    <CardTitle title={film.title}>{film.title}</CardTitle>
                     {film.year && <CardYear>{film.year}</CardYear>}
 
-                    <ReviewPillBtn
-                      type="button"
-                      $color={rc.color}
-                      $bg={rc.bg}
-                      onClick={() => setEditingFilm(film)}
-                      title="Click to edit rating & re-tune taste profile"
-                    >
-                      <span>{rc.symbol} {rc.label}</span>
-                      <span className="edit-icon">✎</span>
-                    </ReviewPillBtn>
+                    <CardActions>
+                      <ReviewPillBtn
+                        type="button"
+                        $color={rc.color}
+                        $bg={rc.bg}
+                        onClick={() => setEditingFilm(film)}
+                        title="Click to edit rating & re-tune taste profile"
+                      >
+                        <span className="pill-label">{rc.symbol} {rc.label}</span>
+                        <span className="edit-icon">✎</span>
+                      </ReviewPillBtn>
+
+                      <RemoveBtn
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfirmDeleteFilm(film)
+                        }}
+                        title="Remove from film logs and mark as unwatched"
+                        aria-label="Remove film"
+                      >
+                        ✕
+                      </RemoveBtn>
+                    </CardActions>
                   </CardBody>
                 </Card>
               )
@@ -618,7 +936,63 @@ function Diary() {
                   )
                 })}
               </TierList>
+
+              <ModalRemoveBtn
+                type="button"
+                disabled={isUpdating}
+                onClick={() => {
+                  const filmToConfirm = editingFilm
+                  setEditingFilm(null)
+                  setConfirmDeleteFilm(filmToConfirm)
+                }}
+                title="Remove this film from your logs and mark it as unwatched"
+              >
+                ✕ Remove & Mark as Unwatched
+              </ModalRemoveBtn>
             </ModalCard>
+          </ModalOverlay>
+        )}
+
+        {/* ── Confirmation Modal ── */}
+        {confirmDeleteFilm && (
+          <ModalOverlay onClick={() => setConfirmDeleteFilm(null)}>
+            <ConfirmModalCard onClick={(e) => e.stopPropagation()}>
+              <ModalCloseBtn onClick={() => setConfirmDeleteFilm(null)} aria-label="Close">
+                ✕
+              </ModalCloseBtn>
+
+              <ConfirmTitle>Remove Film?</ConfirmTitle>
+
+              <ConfirmFilmCard>
+                {confirmDeleteFilm.poster_path ? (
+                  <ConfirmPoster
+                    src={`${TMDB_IMG}${confirmDeleteFilm.poster_path}`}
+                    alt={confirmDeleteFilm.title}
+                  />
+                ) : null}
+                <ConfirmFilmDetails>
+                  <ConfirmFilmTitle title={confirmDeleteFilm.title}>
+                    {confirmDeleteFilm.title}
+                  </ConfirmFilmTitle>
+                  {confirmDeleteFilm.year && (
+                    <ConfirmFilmYear>{confirmDeleteFilm.year}</ConfirmFilmYear>
+                  )}
+                </ConfirmFilmDetails>
+              </ConfirmFilmCard>
+
+              <ConfirmBody>
+                Are you sure you want to remove <strong>{confirmDeleteFilm.title}</strong>? It will be marked as unwatched and removed from your film logs.
+              </ConfirmBody>
+
+              <ConfirmButtonGroup>
+                <CancelBtn type="button" onClick={() => setConfirmDeleteFilm(null)}>
+                  Cancel
+                </CancelBtn>
+                <DeleteConfirmBtn type="button" onClick={handleConfirmRemove}>
+                  ✕ Remove & Unwatch
+                </DeleteConfirmBtn>
+              </ConfirmButtonGroup>
+            </ConfirmModalCard>
           </ModalOverlay>
         )}
 

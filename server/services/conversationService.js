@@ -275,7 +275,7 @@ async function sendMessage(userId, conversationId, text) {
     readBy: [userObjId],
   });
 
-  // 4. Update conversation metadata and unarchive for recipient if previously archived
+  // 4. Unarchive conversation for recipient when a new message arrives if it was previously archived 
   conversation.lastMessage = {
     text: message.text,
     sender: userObjId,
@@ -286,7 +286,12 @@ async function sendMessage(userId, conversationId, text) {
     (id) => id.toString() === userObjId.toString()
   );
 
-  // Update sender's read state
+  // Update sender's read state when receipent reads the message
+
+  /* Because you just wrote and sent the message, you have obviously already "seen" it. By setting your lastReadAt equal to the message creation time:
+  Your inbox won't show "1 new message" for a message you typed yourself.
+  Only the recipient (whose lastReadAt is older than this new message) will see the bold/unread indicator and unread badge. */
+
   const readStateIndex = conversation.readState.findIndex(
     (rs) => rs.user.toString() === userObjId.toString()
   );

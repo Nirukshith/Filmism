@@ -94,6 +94,69 @@ function calculateMatchPercentage(rawScore) {
 }
 
 /**
+ * Rotates cached recommendations across clusters so returning users immediately see
+ * different, fresh recommendations from their pre-calculated personalized cache.
+ */
+function rotateCachedRecommendations(cachedList, clusters, seenIds = []) {
+  if (!Array.isArray(cachedList) || cachedList.length <= 12) {
+    return cachedList;
+  }
+
+  // For each of the user's taste personas (clusters), creates an empty list to store movies belonging to that persona.
+  const clusterBuckets = {};
+  clusters.forEach((c) => {
+    clusterBuckets[c.clusterId] = [];
+  });
+
+  const fallbackClusterId = clusters[0]?.clusterId || 'default';
+  clusterBuckets[fallbackClusterId] = clusterBuckets[fallbackClusterId] || [];
+
+  // Loops through all the cached movies and places each film into its corresponding persona bucket based on item.sourceClusterId.
+  cachedList.forEach((item) => {
+    const bucket = clusterBuckets[item.sourceClusterId] || clusterBuckets[fallbackClusterId];
+    bucket.push(item);
+  });
+
+  // Rotate each cluster bucket so previously top items shift to the back
+  const perClusterRotate = Math.max(2, Math.min(10, Math.ceil(12 / Math.max(1, clusters.length))));
+  Object.keys(clusterBuckets).forEach((cId) => {
+    const bucket = clusterBuckets[cId];
+    if (bucket.length > 4) {
+      const rotateBy = Math.min(perClusterRotate, Math.floor(bucket.length / 2));
+      const head = bucket.slice(0, rotateBy);
+      const tail = bucket.slice(rotateBy);
+      clusterBuckets[cId] = [...tail, ...head];
+    }
+  });
+
+  // Re-weave items using round-robin diversity across all clusters
+  const rotatedList = [];
+  let round = 0;
+  let addedAny = true;
+
+  while (addedAny && rotatedList.length < cachedList.length) {
+    addedAny = false;
+    for (const cluster of clusters) {
+      const bucket = clusterBuckets[cluster.clusterId];
+      if (bucket && bucket[round]) {
+        rotatedList.push(bucket[round]);
+        addedAny = true;
+      }
+    }
+    if (clusterBuckets[fallbackClusterId] && !clusters.find((c) => c.clusterId === fallbackClusterId)) {
+      const fallbackBucket = clusterBuckets[fallbackClusterId];
+      if (fallbackBucket && fallbackBucket[round]) {
+        rotatedList.push(fallbackBucket[round]);
+        addedAny = true;
+      }
+    }
+    round++;
+  }
+
+  return rotatedList.length > 0 ? rotatedList : cachedList;
+}
+
+/**
  * Generate ranked recommendations with diversity guardrails and explanations (Phases 9 & 10).
  */
 async function generateRankedRecommendations(userProfile, options = {}) {
@@ -143,15 +206,48 @@ async function generateRankedRecommendations(userProfile, options = {}) {
     : baseExcludedIds;
 
   // 0. Cache Hit Check: Return cached recommendations filtered against excluded items
-  const isCacheFresh = userProfile.cachedRecommendationsAt && (Date.now() - new Date(userProfile.cachedRecommendationsAt).getTime() < 3600000 * 4); // 4 hours
-  if (!forceRefresh && isCacheFresh && Array.isArray(userProfile.cachedRecommendations) && userProfile.cachedRecommendations.length > 0) {
-    const filteredCached = userProfile.cachedRecommendations.filter((r) => !baseExcludedIds.has(Number(r.id || r.tmdbId)));
+  const shouldRotate = options.rotate === true || userProfile.needsCacheRotation === true;
+  const hasCachedRecs = Array.isArray(userProfile.cachedRecommendations) && userProfile.cachedRecommendations.length > 0;
+
+  if (!forceRefresh && hasCachedRecs) {
+    let candidatePool = userProfile.cachedRecommendations;
+
+    if (shouldRotate && page === 1) {
+      candidatePool = rotateCachedRecommendations(candidatePool, clusters, userProfile.seenRecommendationIds);
+
+      // Persist the rotated order and clear the rotation flag asynchronously
+      if (userProfile._id) {
+        UserTasteProfile.updateOne(
+          { _id: userProfile._id },
+          {
+            $set: {
+              cachedRecommendations: candidatePool,
+              needsCacheRotation: false,
+              cachedRecommendationsAt: new Date(),
+            },
+          }
+        ).catch(() => { });
+      }
+    }
+
+    const filteredCached = candidatePool.filter((r) => !baseExcludedIds.has(Number(r.id || r.tmdbId)));
     const startIndex = (page - 1) * limit;
     const pagedList = filteredCached.slice(startIndex, startIndex + limit);
     pagedList.page = page;
     pagedList.limit = limit;
     pagedList.total = filteredCached.length;
     pagedList.hasMore = startIndex + pagedList.length < filteredCached.length;
+
+    // Track newly shown IDs into seenRecommendationIds asynchronously
+    if (userProfile._id && pagedList.length > 0) {
+      const newlyShownIds = pagedList.map((r) => Number(r.id || r.tmdbId)).filter(Boolean);
+      const updatedSeen = Array.from(new Set([...Array.from(seenIds), ...newlyShownIds])).slice(-200);
+      UserTasteProfile.updateOne(
+        { _id: userProfile._id },
+        { $set: { seenRecommendationIds: updatedSeen } }
+      ).catch(() => { });
+    }
+
     return pagedList;
   }
 
@@ -335,4 +431,5 @@ module.exports = {
   generateRankedRecommendations,
   generateWhyRationale,
   scoreMovieAgainstCluster,
+  rotateCachedRecommendations,
 };

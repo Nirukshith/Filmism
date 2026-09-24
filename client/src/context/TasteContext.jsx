@@ -1,7 +1,15 @@
-import { createContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import api from '../services/api'
 
 export const TasteContext = createContext()
+
+export function useTasteProfile() {
+  const context = useContext(TasteContext)
+  if (!context) {
+    throw new Error('useTasteProfile must be used within a TasteProvider')
+  }
+  return context
+}
 
 export function TasteProvider({ children }) {
   const [selectedGenres, setSelectedGenres]   = useState([])
@@ -18,6 +26,75 @@ export function TasteProvider({ children }) {
   const [ratings, setRatings]                 = useState({})
   const [watchlist, setWatchlist]             = useState([])
   const [aestheticProfile, setAestheticProfile] = useState(null)
+
+  // In-memory & session storage cache for dashboard recommendations to prevent reloading on page navigation
+  const [dashboardRecs, setDashboardRecs]     = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('filmism_dashboard_recs')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
+  const [dashboardTelemetry, setDashboardTelemetry] = useState(null)
+  const [dashboardHasMore, setDashboardHasMore] = useState(true)
+  const [dashboardPage, setDashboardPage]     = useState(1)
+
+  const updateDashboardRecs = (recs) => {
+    setDashboardRecs(recs)
+    try {
+      if (Array.isArray(recs)) {
+        sessionStorage.setItem('filmism_dashboard_recs', JSON.stringify(recs))
+      } else {
+        sessionStorage.removeItem('filmism_dashboard_recs')
+      }
+    } catch {}
+  }
+
+  const removeMovieFromDashboard = (tmdbId) => {
+    const id = Number(tmdbId)
+    setDashboardRecs((prev) => {
+      if (!Array.isArray(prev)) return prev
+      const updated = prev.filter((m) => Number(m.id || m.tmdbId) !== id)
+      try {
+        sessionStorage.setItem('filmism_dashboard_recs', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }
+
+  // Persistent review graph rating stores to prevent graph reload on navigation
+  const [cachedWatchedOutcomes, setCachedWatchedOutcomes] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('filmism_watched_outcomes')
+      return stored ? JSON.parse(stored) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  const [cachedProfileRatings, setCachedProfileRatings] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('filmism_profile_ratings')
+      return stored ? JSON.parse(stored) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  const updateWatchedOutcomes = (outcomes) => {
+    setCachedWatchedOutcomes(outcomes)
+    try {
+      sessionStorage.setItem('filmism_watched_outcomes', JSON.stringify(outcomes))
+    } catch {}
+  }
+
+  const updateProfileRatings = (ratingsMap) => {
+    setCachedProfileRatings(ratingsMap)
+    try {
+      sessionStorage.setItem('filmism_profile_ratings', JSON.stringify(ratingsMap))
+    } catch {}
+  }
 
   // Save guest sessionId
   useEffect(() => {
@@ -265,8 +342,15 @@ export function TasteProvider({ children }) {
     setRatings({})
     setWatchlist([])
     setAestheticProfile(null)
+    setDashboardRecs(null)
+    setDashboardTelemetry(null)
+    setCachedWatchedOutcomes({})
+    setCachedProfileRatings({})
     localStorage.removeItem('filmism_taste_clusters')
     localStorage.removeItem('filmism_ai_synthesis')
+    sessionStorage.removeItem('filmism_dashboard_recs')
+    sessionStorage.removeItem('filmism_watched_outcomes')
+    sessionStorage.removeItem('filmism_profile_ratings')
   }
 
   return (
@@ -297,6 +381,19 @@ export function TasteProvider({ children }) {
         syncTasteProfile,
         clearProfile,
         sessionId,
+        dashboardRecs,
+        updateDashboardRecs,
+        removeMovieFromDashboard,
+        dashboardTelemetry,
+        setDashboardTelemetry,
+        dashboardHasMore,
+        setDashboardHasMore,
+        dashboardPage,
+        setDashboardPage,
+        cachedWatchedOutcomes,
+        updateWatchedOutcomes,
+        cachedProfileRatings,
+        updateProfileRatings,
       }}
     >
       {children}

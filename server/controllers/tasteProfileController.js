@@ -38,10 +38,11 @@ const initializeTasteProfile = async (req, res, next) => {
 
     // Set cookie for guest users (for state preservation across requests)
     if (updatedToken) {
+      const isProduction = process.env.NODE_ENV === 'production'
       res.cookie('token', updatedToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/',
       });

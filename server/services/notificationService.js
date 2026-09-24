@@ -33,7 +33,10 @@ async function createNotification({ recipient, sender, type, title, body, data =
  */
 async function getUserNotifications(userId, { page = 1, limit = 20, unreadOnly = false } = {}) {
   const userObjId = new mongoose.Types.ObjectId(userId);
-  const query = { recipient: userObjId };
+  const query = {
+    recipient: userObjId,
+    $nor: [{ type: 'new_message', isRead: true }],
+  };
 
   if (unreadOnly) {
     query.isRead = false;
@@ -106,6 +109,14 @@ async function markAsRead(userId, notificationId) {
     throw err;
   }
 
+  // Once read, dismiss message notification so it does not linger in tray
+  if (updated.type === 'new_message' && typeof Notification.deleteOne === 'function') {
+    try {
+      const p = Notification.deleteOne({ _id: notifObjId });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (e) {}
+  }
+
   return { success: true, notificationId: updated._id };
 }
 
@@ -119,6 +130,18 @@ async function markAllAsRead(userId) {
     { recipient: userObjId, isRead: false },
     { $set: { isRead: true, readAt: new Date() } }
   );
+
+  // Clean up read message notifications
+  if (typeof Notification.deleteMany === 'function') {
+    try {
+      const p = Notification.deleteMany({
+        recipient: userObjId,
+        type: 'new_message',
+        isRead: true,
+      });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (e) {}
+  }
 
   return { success: true, message: 'All notifications marked as read.' };
 }
@@ -138,6 +161,19 @@ async function markConversationNotificationsAsRead(userId, conversationId) {
     },
     { $set: { isRead: true, readAt: new Date() } }
   );
+
+  // Clean up read message notifications for this conversation
+  if (typeof Notification.deleteMany === 'function') {
+    try {
+      const p = Notification.deleteMany({
+        recipient: userObjId,
+        type: 'new_message',
+        'data.conversationId': convObjId,
+        isRead: true,
+      });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (e) {}
+  }
 }
 
 module.exports = {

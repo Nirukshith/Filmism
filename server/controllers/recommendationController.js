@@ -1,6 +1,7 @@
 const candidatePoolService = require('../services/candidatePoolService');
 const recommendationEngine = require('../services/recommendationEngine');
 const feedbackService = require('../services/feedbackService');
+const tasteClusterService = require('../services/tasteClusterService');
 const UserTasteProfile = require('../models/userTasteProfileModel');
 const RecommendationLog = require('../models/recommendationLogModel');
 const tmdb = require('../services/tmdbService');
@@ -83,6 +84,10 @@ const getRankedRecommendations = async (req, res, next) => {
       req.query.forceRefresh === true ||
       req.query.forceRefresh === 'true';
 
+    const rotate =
+      req.query.rotate === true ||
+      req.query.rotate === 'true';
+
     const query = userId ? { userId } : { sessionId };
     const profile = await UserTasteProfile.findOne(query).sort({ updatedAt: -1 });
 
@@ -93,7 +98,7 @@ const getRankedRecommendations = async (req, res, next) => {
       });
     }
 
-    const recommendations = await recommendationEngine.generateRankedRecommendations(profile, { page, limit, refresh });
+    const recommendations = await recommendationEngine.generateRankedRecommendations(profile, { page, limit, refresh, rotate });
 
     res.json({
       success: true,
@@ -198,17 +203,24 @@ const getWatchlist = async (req, res, next) => {
     const sessionId = req.query.sessionId;
     const query = userId ? { userId } : { sessionId };
 
-    // Fetch all watchlisted logs, deduplicated by tmdbId (keep latest)
-    const logs = await RecommendationLog.find({ ...query, action: 'watchlisted' })
+    // Fetch interaction logs to determine current status (excluding watched or dismissed films)
+    const logs = await RecommendationLog.find({
+      ...query,
+      action: { $in: ['watchlisted', 'watched', 'dismissed'] },
+    })
       .sort({ createdAt: -1 })
       .lean();
 
-    // Deduplicate — keep only the most recent entry per tmdbId
+    // Deduplicate — keep only the most recent entry per tmdbId and include only if active
     const seen = new Set();
-    const unique = logs.filter((l) => {
-      if (seen.has(l.tmdbId)) return false;
-      seen.add(l.tmdbId);
-      return true;
+    const unique = [];
+    logs.forEach((l) => {
+      if (!seen.has(l.tmdbId)) {
+        seen.add(l.tmdbId);
+        if (l.action === 'watchlisted') {
+          unique.push(l);
+        }
+      }
     });
 
     if (unique.length === 0) {
@@ -365,6 +377,86 @@ const getDiary = async (req, res, next) => {
   }
 };
 
+/**
+ * DELETE /api/recommendations/diary/:tmdbId
+ * Remove a film from the user's diary / film logs and mark it as unwatched.
+ */
+const removeFromDiary = async (req, res, next) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const sessionId = req.query.sessionId || req.body?.sessionId;
+    const query = userId ? { userId } : { sessionId };
+    const tmdbId = Number(req.params.tmdbId);
+
+    if (!tmdbId || isNaN(tmdbId)) {
+      return res.status(400).json({ success: false, message: 'Valid tmdbId parameter is required.' });
+    }
+
+    // 1. Delete all watched logs for this film
+    await RecommendationLog.deleteMany({
+      ...query,
+      tmdbId,
+      action: 'watched',
+    });
+
+    let clusters = null;
+    let aiSynthesis = null;
+
+    // 2. Fetch the user's taste profile
+    const profile = await UserTasteProfile.findOne(query).sort({ updatedAt: -1 });
+
+    if (profile) {
+      const initialFavCount = (profile.favorites || []).length;
+      const remainingFavorites = (profile.favorites || []).filter(
+        (f) => Number(f.tmdbId || f.id) !== tmdbId
+      );
+
+      const wasFavorite = remainingFavorites.length !== initialFavCount;
+
+      if (wasFavorite) {
+        if (remainingFavorites.length > 0) {
+          // Re-calculate clusters, centroid vectors, and globalCentroid with remaining favorites
+          const rebuilt = await tasteClusterService.buildTasteProfileFromFavorites({
+            userId,
+            sessionId,
+            genres: profile.selectedGenres,
+            origins: profile.selectedOrigins,
+            favorites: remainingFavorites,
+          });
+          clusters = rebuilt.clusters;
+          aiSynthesis = rebuilt.aiSynthesis;
+        } else {
+          // User removed their last favorite
+          profile.favorites = [];
+          profile.tasteClusters = [];
+          profile.globalCentroid = [];
+          profile.cachedRecommendations = [];
+          profile.cachedRecommendationsAt = null;
+          await profile.save();
+        }
+      }
+
+      // Remove only the deleted film from cached recommendations so remaining cached recommendations load instantly (<20ms)
+      if (profile && Array.isArray(profile.cachedRecommendations)) {
+        profile.cachedRecommendations = profile.cachedRecommendations.filter(
+          (r) => Number(r.id || r.tmdbId) !== tmdbId
+        );
+        await profile.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Film removed from film logs and marked as unwatched.',
+      tmdbId,
+      clusters,
+      aiSynthesis,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCandidatePool,
   rateCandidateFilm,
@@ -374,4 +466,5 @@ module.exports = {
   getTelemetryStats,
   getWatchlist,
   getDiary,
+  removeFromDiary,
 };

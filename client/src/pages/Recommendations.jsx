@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTasteProfile } from '../hooks/useTasteProfile'
 import { getAuthStatus } from '../utils/auth'
@@ -7,7 +7,58 @@ import api from '../services/api'
 import PostWatchModal from '../components/PostWatchModal'
 import UserAvatar from '../components/UserAvatar'
 import ReviewGraph from '../components/ReviewGraph'
+import ClapperLoader from '../components/ClapperLoader'
 import { CINEMAS } from '../constants/data'
+
+// ─── Cinema Themed SVG Icons ──────────────────────────────────────────────────
+
+const StyledFilmReel = styled.svg`
+  flex-shrink: 0;
+  animation: ${({ $spinning }) => ($spinning ? 'filmReelSpinAnim 0.85s linear infinite' : 'none')};
+
+  @keyframes filmReelSpinAnim {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+`
+
+const FilmReelIcon = ({ size = 13, spinning = false }) => (
+  <StyledFilmReel
+    $spinning={spinning}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="3" />
+    <circle cx="12" cy="6" r="1.3" fill="currentColor" />
+    <circle cx="12" cy="18" r="1.3" fill="currentColor" />
+    <circle cx="6" cy="12" r="1.3" fill="currentColor" />
+    <circle cx="18" cy="12" r="1.3" fill="currentColor" />
+  </StyledFilmReel>
+)
+
+const FilmStripIcon = ({ size = 13 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0 }}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <path d="M7 3v18M17 3v18M3 12h18M3 7.5h4M3 16.5h4M17 7.5h4M17 16.5h4" />
+  </svg>
+)
 
 // ─── Styled Components ────────────────────────────────────────────────────────
 
@@ -76,23 +127,61 @@ const TelemetryBadge = styled.div`
   }
 `
 
+const TopbarRefreshBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #18181b;
+  background: #ffffff;
+  border: 1px solid #e2e2e5;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  opacity: ${({ $disabled }) => ($disabled ? 0.65 : 1)};
+  pointer-events: ${({ $disabled }) => ($disabled ? 'none' : 'auto')};
+
+  &:hover {
+    background: #f4f4f6;
+    border-color: #d1d1d6;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`
+
 const ContinueBtn = styled.button`
   font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 600;
   color: #fff;
   background: #ff751f;
-  border: 1.5px solid #ff751f;
-  padding: 4px 10px;
-  border-radius: 4px;
+  border: 1px solid #ff751f;
+  padding: 6px 13px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
+  transition: all 0.15s ease;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  white-space: nowrap;
+
   &:hover {
     background: #e6600c;
     border-color: #e6600c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 117, 31, 0.25);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 `
 
@@ -451,38 +540,118 @@ const RecActionsLeft = styled.div`
   flex-wrap: wrap;
 `
 
-const ActionBtn = styled.button`
+const BookmarkIcon = ({ filled = false, size = 12 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={filled ? '#ff751f' : 'none'}
+    stroke={filled ? '#ff751f' : 'currentColor'}
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0, transition: 'all 0.15s ease' }}
+  >
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+  </svg>
+)
+
+const EyeIcon = ({ size = 13 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0 }}
+  >
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const RecWatchlistBtn = styled.button`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 5px;
+  border-radius: 6px;
+  padding: 6px 12px;
   cursor: pointer;
-  display: flex;
+  transition: all 0.15s ease;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  transition: all 0.2s;
+  justify-content: center;
+  gap: 6px;
   white-space: nowrap;
 
-  border: 1.5px solid ${({ $active, $type }) => ($active ? ($type === 'watched' ? '#2e7d32' : '#ff751f') : '#ddd')};
-  background: ${({ $active, $type }) => ($active ? ($type === 'watched' ? 'rgba(46,125,50,0.1)' : 'rgba(255,117,31,0.1)') : '#fff')};
-  color: ${({ $active, $type }) => ($active ? ($type === 'watched' ? '#2e7d32' : '#ff751f') : '#666')};
+  border: 1px solid ${({ $active }) => ($active ? '#18181b' : '#e2e2e5')};
+  background: ${({ $active }) => ($active ? '#18181b' : '#f4f4f6')};
+  color: ${({ $active }) => ($active ? '#ffffff' : '#222224')};
 
   &:hover {
-    border-color: #111;
-    color: #111;
+    background: ${({ $active }) => ($active ? '#27272a' : '#eaebee')};
+    color: ${({ $active }) => ($active ? '#ffffff' : '#000000')};
+    border-color: ${({ $active }) => ($active ? '#27272a' : '#d2d3d8')};
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`
+
+const RecMarkWatchedBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: ${({ $active }) => ($active ? '#ffffff' : '#222224')};
+  background: ${({ $active }) => ($active ? '#2e7d32' : '#f4f4f6')};
+  border: 1px solid ${({ $active }) => ($active ? '#2e7d32' : '#e2e2e5')};
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+
+  &:hover {
+    background: ${({ $active }) => ($active ? '#256629' : '#eaebee')};
+    border-color: ${({ $active }) => ($active ? '#256629' : '#d2d3d8')};
+    color: ${({ $active }) => ($active ? '#ffffff' : '#000000')};
+    transform: translateY(-1px);
+    box-shadow: ${({ $active }) =>
+    $active
+      ? '0 2px 8px rgba(46, 125, 50, 0.25)'
+      : '0 2px 6px rgba(0, 0, 0, 0.05)'};
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 `
 
 const DismissBtn = styled.button`
-  background: none;
+  background: transparent;
   border: none;
-  color: #aaa;
+  color: #888;
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.68rem;
   cursor: pointer;
-  padding: 2px 4px;
-  &:hover { color: #e05353; }
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover {
+    color: #e05353;
+    background: #fdf2f2;
+  }
 `
 
 const EmptyState = styled.div`
@@ -543,7 +712,25 @@ const EndOfListNotice = styled.div`
 
 function Recommendations() {
   const navigate = useNavigate()
-  const { sessionId, tasteClusters, favoriteRatings, selectedCinemas, userTasteProfile } = useTasteProfile()
+  const {
+    sessionId,
+    tasteClusters,
+    favoriteRatings,
+    selectedCinemas,
+    userTasteProfile,
+    dashboardRecs,
+    updateDashboardRecs,
+    dashboardTelemetry,
+    setDashboardTelemetry,
+    dashboardHasMore,
+    setDashboardHasMore,
+    dashboardPage,
+    setDashboardPage,
+    cachedWatchedOutcomes,
+    updateWatchedOutcomes,
+    cachedProfileRatings,
+    updateProfileRatings,
+  } = useTasteProfile()
   const { user } = getAuthStatus()
   const isReturningUser = localStorage.getItem('filmism_is_returning_user') === 'true'
 
@@ -554,20 +741,21 @@ function Recommendations() {
     greetingTitle = 'Welcome back'
   }
 
-  const [recommendations, setRecommendations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
+  const hasExistingRecs = Array.isArray(dashboardRecs) && dashboardRecs.length > 0
+  const [recommendations, setRecommendations] = useState(() => (hasExistingRecs ? dashboardRecs : []))
+  const [loading, setLoading] = useState(() => !hasExistingRecs)
+  const [page, setPage] = useState(() => dashboardPage || 1)
+  const [hasMore, setHasMore] = useState(() => (dashboardHasMore !== undefined ? dashboardHasMore : true))
   const [loadingMore, setLoadingMore] = useState(false)
   const [activePersonaFilter, setActivePersonaFilter] = useState('all')
   const [activeOriginFilter, setActiveOriginFilter] = useState('all')
   const [userOrigins, setUserOrigins] = useState([])
   const [watchlist, setWatchlist] = useState([])
-  const [watchedOutcomes, setWatchedOutcomes] = useState({}) // { [tmdbId]: ratingNumber }
-  const [profileRatings, setProfileRatings] = useState({}) // { [tmdbId]: ratingNumber } from onboarding/profile
+  const [watchedOutcomes, setWatchedOutcomes] = useState(() => cachedWatchedOutcomes || {}) // { [tmdbId]: ratingNumber }
+  const [profileRatings, setProfileRatings] = useState(() => cachedProfileRatings || {}) // { [tmdbId]: ratingNumber } from onboarding/profile
   const [dismissed, setDismissed] = useState([])
   const [activeModalMovie, setActiveModalMovie] = useState(null)
-  const [telemetry, setTelemetry] = useState({ hitRate: 88, totalShown: 0 })
+  const [telemetry, setTelemetry] = useState(() => dashboardTelemetry || { hitRate: 88, totalShown: 0 })
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Normalize an origin item (number ID, country code, or name) to a CINEMAS object
@@ -615,24 +803,29 @@ function Recommendations() {
     }
   }
 
-  const fetchRecommendations = async (pageNum = 1, append = false, refresh = false) => {
-    if (refresh) setIsRefreshing(true)
-    if (append) {
+  const fetchRecommendations = async (pageNum = 1, append = false, refresh = false, rotate = false) => {
+    if (refresh) {
+      setIsRefreshing(true)
+      setLoading(true)
+    } else if (append) {
       setLoadingMore(true)
-    } else {
+    } else if (!hasExistingRecs && recommendations.length === 0) {
       setLoading(true)
     }
 
     try {
       const [recsRes, statsRes] = await Promise.allSettled([
-        api.get('/recommendations/ranked', { params: { sessionId, page: pageNum, limit: 12, refresh } }),
+        api.get('/recommendations/ranked', { params: { sessionId, page: pageNum, limit: 12, refresh, rotate } }),
         api.get('/recommendations/telemetry-stats', { params: { sessionId } }),
       ])
 
       if (recsRes.status === 'fulfilled' && recsRes.value.data?.recommendations) {
         const newRecs = recsRes.value.data.recommendations
-        setHasMore(recsRes.value.data.hasMore !== undefined ? recsRes.value.data.hasMore : newRecs.length >= 12)
+        const more = recsRes.value.data.hasMore !== undefined ? recsRes.value.data.hasMore : newRecs.length >= 12
+        setHasMore(more)
+        if (setDashboardHasMore) setDashboardHasMore(more)
         setPage(pageNum)
+        if (setDashboardPage) setDashboardPage(pageNum)
 
         if (recsRes.value.data.selectedOrigins?.length > 0) {
           setUserOrigins((prev) => Array.from(new Set([...prev, ...recsRes.value.data.selectedOrigins])))
@@ -642,14 +835,18 @@ function Recommendations() {
           setRecommendations((prev) => {
             const existingIds = new Set(prev.map((r) => r.id))
             const filteredNew = newRecs.filter((r) => !existingIds.has(r.id))
-            return [...prev, ...filteredNew]
+            const combined = [...prev, ...filteredNew]
+            if (updateDashboardRecs) updateDashboardRecs(combined)
+            return combined
           })
         } else {
           setRecommendations(newRecs)
+          if (updateDashboardRecs) updateDashboardRecs(newRecs)
         }
       }
       if (statsRes.status === 'fulfilled' && statsRes.value.data?.stats) {
         setTelemetry(statsRes.value.data.stats)
+        if (setDashboardTelemetry) setDashboardTelemetry(statsRes.value.data.stats)
       }
     } catch (err) {
       console.warn('Failed to load recommendations:', err.message)
@@ -662,15 +859,7 @@ function Recommendations() {
 
   // Fetch recommendations and profile data
   useEffect(() => {
-    const fetchInitialData = async () => {
-      // Initialize user origins from taste context if present
-      if (selectedCinemas?.length > 0) {
-        setUserOrigins(selectedCinemas)
-      } else if (userTasteProfile?.selectedOrigins?.length > 0) {
-        setUserOrigins(userTasteProfile.selectedOrigins)
-      }
-
-      // 1. Fetch user's existing logs and profile data
+    const fetchAuxiliaryData = async () => {
       try {
         const [wRes, dRes, pRes] = await Promise.allSettled([
           api.get('/recommendations/watchlist', { params: { sessionId } }),
@@ -687,6 +876,7 @@ function Recommendations() {
             if (id) outcomes[id] = item.outcomeRating || 3
           })
           setWatchedOutcomes(outcomes)
+          if (updateWatchedOutcomes) updateWatchedOutcomes(outcomes)
         }
         if (pRes.status === 'fulfilled' && pRes.value.data?.tasteProfile) {
           const tp = pRes.value.data.tasteProfile
@@ -697,6 +887,7 @@ function Recommendations() {
               if (id && item.rating) pRatings[id] = item.rating
             })
             setProfileRatings(pRatings)
+            if (updateProfileRatings) updateProfileRatings(pRatings)
           }
           if (tp.selectedOrigins?.length > 0) {
             setUserOrigins(tp.selectedOrigins)
@@ -705,15 +896,38 @@ function Recommendations() {
       } catch (e) {
         // silent fallback
       }
+    }
 
-      // 2. Fetch recommendations
-      const needsRefresh = localStorage.getItem('filmism_needs_refresh') === 'true'
-      if (needsRefresh) {
-        localStorage.removeItem('filmism_needs_refresh')
-        fetchRecommendations(1, false, true)
-      } else {
-        fetchRecommendations(1, false)
+    const fetchInitialData = async () => {
+      // Initialize user origins from taste context if present
+      if (selectedCinemas?.length > 0) {
+        setUserOrigins(selectedCinemas)
+      } else if (userTasteProfile?.selectedOrigins?.length > 0) {
+        setUserOrigins(userTasteProfile.selectedOrigins)
       }
+
+      // Check if this is a login needing a cached recommendations rotation
+      const needsRotate = localStorage.getItem('filmism_rotate_cache') === 'true'
+      if (needsRotate) {
+        localStorage.removeItem('filmism_rotate_cache')
+      }
+
+      // If we already have films loaded in memory/session, show them INSTANTLY without any loader!
+      if (hasExistingRecs) {
+        setRecommendations(dashboardRecs)
+        setLoading(false)
+        if (dashboardTelemetry) setTelemetry(dashboardTelemetry)
+        if (dashboardHasMore !== undefined) setHasMore(dashboardHasMore)
+        if (dashboardPage !== undefined) setPage(dashboardPage)
+
+        // Quietly sync watchlist, diary outcomes & profile in background (zero blocking!)
+        fetchAuxiliaryData()
+        return
+      }
+
+      // First time loading (no cached films): fetch recommendations
+      fetchRecommendations(1, false, false, needsRotate)
+      fetchAuxiliaryData()
     }
 
     fetchInitialData()
@@ -733,7 +947,11 @@ function Recommendations() {
       : [...watchlist, movieId]
 
     setWatchlist(newWatchlist)
-    setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
+    setRecommendations((prev) => {
+      const filtered = prev.filter((m) => Number(m.id || m.tmdbId) !== movieId)
+      if (updateDashboardRecs) updateDashboardRecs(filtered)
+      return filtered
+    })
 
     try {
       await api.post('/recommendations/action', {
@@ -753,7 +971,11 @@ function Recommendations() {
   const handleDismiss = async (movie) => {
     const movieId = Number(movie.id || movie.tmdbId)
     setDismissed((prev) => [...prev, movieId])
-    setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
+    setRecommendations((prev) => {
+      const filtered = prev.filter((m) => Number(m.id || m.tmdbId) !== movieId)
+      if (updateDashboardRecs) updateDashboardRecs(filtered)
+      return filtered
+    })
     try {
       await api.post('/recommendations/action', {
         sessionId,
@@ -773,11 +995,19 @@ function Recommendations() {
 
   const handleSubmitOutcome = async (movie, outcomeRating) => {
     const movieId = Number(movie.id || movie.tmdbId)
-    setWatchedOutcomes((prev) => ({
-      ...prev,
-      [movieId]: outcomeRating,
-    }))
-    setRecommendations((prev) => prev.filter((m) => Number(m.id || m.tmdbId) !== movieId))
+    setWatchedOutcomes((prev) => {
+      const updated = {
+        ...prev,
+        [movieId]: outcomeRating,
+      }
+      if (updateWatchedOutcomes) updateWatchedOutcomes(updated)
+      return updated
+    })
+    setRecommendations((prev) => {
+      const filtered = prev.filter((m) => Number(m.id || m.tmdbId) !== movieId)
+      if (updateDashboardRecs) updateDashboardRecs(filtered)
+      return filtered
+    })
     setActiveModalMovie(null)
 
     try {
@@ -818,13 +1048,13 @@ function Recommendations() {
   const chosenOriginObjects = []
   const seenOriginNames = new Set()
 
-  ;(userOrigins || []).forEach((o) => {
-    const info = getOriginInfo(o)
-    if (info && !seenOriginNames.has(info.name)) {
-      seenOriginNames.add(info.name)
-      chosenOriginObjects.push(info)
-    }
-  })
+    ; (userOrigins || []).forEach((o) => {
+      const info = getOriginInfo(o)
+      if (info && !seenOriginNames.has(info.name)) {
+        seenOriginNames.add(info.name)
+        chosenOriginObjects.push(info)
+      }
+    })
 
   // Filter recommendations by Persona and User-Chosen Cinema Origin
   const filteredRecs = activeRecs.filter((r) => {
@@ -904,15 +1134,21 @@ function Recommendations() {
         <Topbar>
           <Logo>Filmism</Logo>
           <TopbarRight>
-            <RefineBtn
-              style={{ background: '#fff', color: '#111', border: '1.5px solid #ccc', opacity: isRefreshing ? 0.7 : 1, fontSize: '0.75rem', padding: '4px 10px' }}
+            <TopbarRefreshBtn
               disabled={isRefreshing}
+              $disabled={isRefreshing}
               onClick={() => fetchRecommendations(1, false, true)}
+              title="Refresh personalized recommendations with newly ranked matches"
             >
-              {isRefreshing ? '↻ Refreshing...' : '↻ Refresh Matches'}
-            </RefineBtn>
-            <ContinueBtn onClick={() => navigate('/taste?mode=continue')}>
-              + Continue Build Profile
+              <FilmReelIcon size={13} spinning={isRefreshing} />
+              {isRefreshing ? 'Refreshing Matches...' : 'Refresh Matches'}
+            </TopbarRefreshBtn>
+            <ContinueBtn
+              onClick={() => navigate('/taste?mode=continue')}
+              title="Tune and expand your cinema taste profile"
+            >
+              <FilmStripIcon size={13} />
+              Continue Build Profile
             </ContinueBtn>
             <UserAvatar />
           </TopbarRight>
@@ -1006,8 +1242,11 @@ function Recommendations() {
             )}
           </FilterContainer>
 
-          {loading ? (
-            <EmptyState>Loading personalized recommendations...</EmptyState>
+          {loading || isRefreshing ? (
+            <ClapperLoader
+              label={isRefreshing ? "Discovering Fresh Matches..." : "Cueing Recommendations..."}
+              subLabel={isRefreshing ? "Scanning cinematic personas & fresh candidates" : "Matching your cinephile taste personas"}
+            />
           ) : filteredRecs.length === 0 ? (
             <EmptyState>
               <p style={{ margin: '0 0 1rem', fontSize: '1rem', color: '#444', fontWeight: 600 }}>
@@ -1086,20 +1325,22 @@ function Recommendations() {
 
                       <RecActions>
                         <RecActionsLeft>
-                          <ActionBtn
-                            $type="watchlist"
+                          <RecWatchlistBtn
                             $active={isWatchlisted}
                             onClick={() => handleToggleWatchlist(rec)}
+                            title={isWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}
                           >
-                            {isWatchlisted ? '✓ Watchlisted' : '+ Watchlist'}
-                          </ActionBtn>
-                          <ActionBtn
-                            $type="watched"
+                            <BookmarkIcon filled={isWatchlisted} size={12} />
+                            {isWatchlisted ? 'In Watchlist' : 'Watchlist'}
+                          </RecWatchlistBtn>
+                          <RecMarkWatchedBtn
                             $active={isWatched}
                             onClick={() => handleOpenWatchedModal(rec)}
+                            title={isWatched ? 'Edit Diary Entry' : 'Mark as Watched'}
                           >
-                            {isWatched ? '✓ Rated Outcome' : 'Mark Watched'}
-                          </ActionBtn>
+                            <EyeIcon size={13} />
+                            {isWatched ? 'Rated Outcome' : 'Mark Watched'}
+                          </RecMarkWatchedBtn>
                         </RecActionsLeft>
                         <DismissBtn onClick={() => handleDismiss(rec)}>
                           not interested ✕

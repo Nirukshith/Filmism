@@ -641,7 +641,7 @@ const TwinBtn = styled(Link)`
 
 export default function Messages() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialConvId = searchParams.get('conversationId')
+  const initialConvId = searchParams.get('conversationId') || searchParams.get('conv')
 
   const [activeTab, setActiveTab] = useState('conversations') // 'conversations' | 'requests'
   const [conversations, setConversations] = useState([])
@@ -733,9 +733,11 @@ export default function Messages() {
           if (isPolling) {
             if (res.data.messages.length > 0) {
               setMessages((prev) => [...prev, ...res.data.messages])
+              window.dispatchEvent(new Event('filmism_notifications_updated'))
             }
           } else {
             setMessages(res.data.messages)
+            window.dispatchEvent(new Event('filmism_notifications_updated'))
           }
         }
       } catch (err) {

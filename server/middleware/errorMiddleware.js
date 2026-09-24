@@ -86,7 +86,13 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // 6. Upstream / Axios Network & Timeout Errors
-  if (err.isTimeout || err.code === 'ECONNABORTED') {
+  if (err.name === 'MongoServerSelectionError' || err.name === 'MongoNetworkError' || (err.message && err.message.includes('SSL alert number 80'))) {
+    error = {
+      statusCode: 503,
+      message: 'Database connection failed: Your current IP address is not whitelisted in MongoDB Atlas Network Access. Please add your current IP or 0.0.0.0/0 in MongoDB Atlas.',
+      isOperational: true,
+    };
+  } else if (err.isTimeout || err.code === 'ECONNABORTED') {
     error = {
       statusCode: 504,
       message: err.message || 'Upstream service timed out. Please try again.',

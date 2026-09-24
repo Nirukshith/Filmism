@@ -114,6 +114,10 @@ const userTasteProfileSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    needsCacheRotation: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
