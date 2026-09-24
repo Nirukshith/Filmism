@@ -1,4 +1,4 @@
-# 🎬 Filmism — Aesthetic Cinema Discovery & Taste Profiling Platform
+# 🎬 Filmism — Cinema Taste Profiling, Personalized Discovery & Cinephile Matchmaking Platform
 
 [![Live App](https://img.shields.io/badge/Live%20App-filmism.vercel.app-ff751f?style=for-the-badge&logo=vercel&logoColor=white)](https://filmism.vercel.app)
 [![API](https://img.shields.io/badge/API-AWS%20EC2-232f3e?style=for-the-badge&logo=amazon-aws&logoColor=white)](https://filmism-api.duckdns.org)
@@ -6,8 +6,8 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas%20Vector-47a248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
-> **"Discover films that feel like you."**  
-> Filmism is a full-stack, cloud-deployed cinema discovery platform that constructs multi-cluster taste profiles from your chosen **genres**, **global cinema origins**, and **favorite rated films**, powered by vector mathematical modeling and AI-driven craftsmanship synthesis.
+> **"Discover films that feel like you — and the cinephiles who share your taste."**  
+> Filmism is a full-stack cinema discovery and social matchmaking platform. It constructs multi-persona taste clusters from your chosen **genres**, **global cinema origins**, and **rated favorite films**, powering vector-ranked movie recommendations alongside **Cinephile Twin matchmaking** and **real-time chat**.
 
 ---
 
