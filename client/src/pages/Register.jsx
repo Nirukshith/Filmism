@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import styled from 'styled-components'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authAPI } from '../services/api'
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
@@ -158,6 +158,51 @@ const Input = styled.input`
   }
 `
 
+const PasswordInputWrap = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+`
+
+const PasswordInput = styled(Input)`
+  padding-right: 2.4rem;
+`
+
+const ShowPasswordBtn = styled.button`
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 0.35rem 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #111;
+  }
+`
+
+const EyeIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const EyeOffIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+)
+
 const ErrorText = styled.span`
   font-family: 'Lexend Deca', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: 0.75rem;
@@ -289,6 +334,8 @@ const FeatureItem = styled.li`
 
 function RegisterPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
 
   const [form, setForm] = useState({
     firstName: '',
@@ -300,6 +347,12 @@ function RegisterPage() {
 
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [step, setStep] = useState('register')
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -314,8 +367,17 @@ function RegisterPage() {
     if (!form.lastName.trim())  newErrors.lastName  = 'required'
     if (!form.email.trim())     newErrors.email     = 'required'
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'invalid email'
-    if (!form.password)         newErrors.password  = 'required'
-    else if (form.password.length < 6) newErrors.password = 'min 6 characters'
+    if (!form.password) {
+      newErrors.password = 'required'
+    } else if (form.password.length < 8) {
+      newErrors.password = 'min 8 characters'
+    } else if (!/[A-Z]/.test(form.password)) {
+      newErrors.password = 'must contain 1 uppercase letter'
+    } else if (!/\d/.test(form.password)) {
+      newErrors.password = 'must contain 1 number'
+    } else if (!/[^A-Za-z0-9]/.test(form.password)) {
+      newErrors.password = 'must contain 1 special character'
+    }
     if (form.confirmPassword !== form.password) newErrors.confirmPassword = 'passwords do not match'
     return newErrors
   }
@@ -344,12 +406,66 @@ function RegisterPage() {
         localStorage.setItem('user', JSON.stringify(response.data))
       }
       
-      navigate('/taste') // go to taste profile flow after register
+      setStep('otp') // go to taste profile flow after register
     } catch (err) {
       const message = err.response?.data?.message || 'Something went wrong. Please try again.'
       setErrors({ general: message })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (e) => {
+  e.preventDefault()
+  if (!otp.trim() || otp.length !== 6) {
+    setOtpError('enter the 6-digit code')
+    return
+  }
+
+    e.preventDefault()
+    if (!otp.trim() || otp.length !== 6) {
+      setOtpError('enter the 6-digit code')
+      return
+    }
+
+    setLoading(true)
+    setOtpError('')
+    try {
+      const response = await authAPI.verifyOtp({ email: form.email, otp })
+
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token)
+        localStorage.setItem('user', JSON.stringify(response.data))
+        localStorage.removeItem('filmism_is_returning_user')
+        window.dispatchEvent(new Event('filmism_auth_update'))
+      }
+
+      navigate(returnTo || '/taste')
+    } catch (err) {
+      const message = err.response?.data?.message || 'invalid or expired code'
+      setOtpError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return
+    try {
+      await authAPI.resendOtp({ email: form.email })
+      setOtpError('')
+      setResendCooldown(30)
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    } catch (err) {
+      setOtpError(err.response?.data?.message || 'failed to resend code')
     }
   }
 
@@ -378,7 +494,7 @@ function RegisterPage() {
         <FormHeader>
           <FormTitle>Create your<br />account.</FormTitle>
         </FormHeader>
-
+        {step === 'register' ? (
         <Form onSubmit={handleSubmit} noValidate>
 
           <FieldRow>
@@ -424,27 +540,45 @@ function RegisterPage() {
 
           <Field>
             <Label htmlFor="password">password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="min. 6 characters"
-              value={form.password}
-              onChange={handleChange}
-            />
+            <PasswordInputWrap>
+              <PasswordInput
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="min. 8 chars, 1 uppercase, 1 special char"
+                value={form.password}
+                onChange={handleChange}
+              />
+              <ShowPasswordBtn
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </ShowPasswordBtn>
+            </PasswordInputWrap>
             {errors.password && <ErrorText>{errors.password}</ErrorText>}
           </Field>
 
           <Field>
             <Label htmlFor="confirmPassword">confirm password</Label>
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              placeholder="repeat your password"
-              value={form.confirmPassword}
-              onChange={handleChange}
-            />
+            <PasswordInputWrap>
+              <PasswordInput
+                id="confirmPassword"
+                name="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder="repeat your password"
+                value={form.confirmPassword}
+                onChange={handleChange}
+              />
+              <ShowPasswordBtn
+                type="button"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </ShowPasswordBtn>
+            </PasswordInputWrap>
             {errors.confirmPassword && <ErrorText>{errors.confirmPassword}</ErrorText>}
           </Field>
 
@@ -457,10 +591,54 @@ function RegisterPage() {
           <Divider><span>or</span></Divider>
 
           <LoginPrompt>
-            already have an account? <Link to="/login">log in</Link>
+            already have an account? <Link to={`/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}>log in</Link>
           </LoginPrompt>
 
         </Form>
+      ) : (
+        <Form onSubmit={handleVerifyOtp} noValidate>
+
+          <FormSubtitle style={{ marginBottom: '0.5rem' }}>
+            we sent a 6-digit code to <strong>{form.email}</strong>
+          </FormSubtitle>
+
+          <Field>
+            <Label htmlFor="otp">verification code</Label>
+            <Input
+              id="otp"
+              name="otp"
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              value={otp}
+              onChange={(e) => {
+                setOtp(e.target.value.replace(/\D/g, ''))
+                if (otpError) setOtpError('')
+              }}
+              style={{ letterSpacing: '0.5em', fontSize: '1.3rem', textAlign: 'center' }}
+            />
+            {otpError && <ErrorText>{otpError}</ErrorText>}
+          </Field>
+
+          <SubmitBtn type="submit" disabled={loading}>
+            {loading ? 'verifying...' : 'verify →'}
+          </SubmitBtn>
+
+          <LoginPrompt>
+            didn't get a code?{' '}
+            {resendCooldown > 0 ? (
+              <span>resend in {resendCooldown}s</span>
+            ) : (
+              <a href="#" onClick={(e) => { e.preventDefault(); handleResendOtp() }}>
+                resend code
+              </a>
+            )}
+          </LoginPrompt>
+
+        </Form>
+      )}
+      
       </LeftPanel>
 
     </PageWrapper>

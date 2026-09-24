@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import styled from 'styled-components'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import loginPoster from '../assets/loginposter.png'
 import { authAPI } from '../services/api'
 import { useTasteProfile } from '../hooks/useTasteProfile'
@@ -253,20 +253,36 @@ const PasswordInput = styled(Input)`
 const ShowPasswordBtn = styled.button`
   position: absolute;
   right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
-  font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.75rem;
   color: #888;
   cursor: pointer;
-  text-transform: lowercase;
-  padding: 0;
+  padding: 0.35rem 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: color 0.2s;
 
   &:hover {
     color: #111;
   }
 `
+
+const EyeIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const EyeOffIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+)
 
 const ForgotLink = styled(Link)`
   font-family: 'Lexend Deca', sans-serif;
@@ -360,15 +376,17 @@ const RegisterPrompt = styled.p`
 
 function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
 
   const [form, setForm] = useState({
     email: '',
     password: '',
   })
 
-  const [errors, setErrors]       = useState({})
-  const [loading, setLoading]     = useState(false)
-  const [showPass, setShowPass]   = useState(false)
+  const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [showPass, setShowPass] = useState(false)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -378,9 +396,9 @@ function LoginPage() {
 
   const validate = () => {
     const newErrors = {}
-    if (!form.email.trim())   newErrors.email    = 'required'
+    if (!form.email.trim()) newErrors.email = 'required'
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'invalid email'
-    if (!form.password)       newErrors.password = 'required'
+    if (!form.password) newErrors.password = 'required'
     return newErrors
   }
 
@@ -395,18 +413,24 @@ function LoginPage() {
     setLoading(true)
     try {
       const response = await authAPI.login({ email: form.email, password: form.password })
-      
+
       if (response.data.token) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data))
+        localStorage.setItem('filmism_rotate_cache', 'true')  // rotate cached recommendations on login
+        localStorage.removeItem('filmism_needs_refresh')
+        localStorage.setItem('filmism_is_returning_user', 'true')
+        window.dispatchEvent(new Event('filmism_auth_update'))
       }
 
       const user = response.data
-      // If user has already completed taste profile setup, redirect to recommendations
-      if (
-        (user.selectedGenres && user.selectedGenres.length > 0) ||
-        (user.selectedCinemas && user.selectedCinemas.length > 0)
-      ) {
+      const isComplete = !!(user.tasteProfileComplete)
+
+      if (user?.role === 'admin') {
+        navigate(returnTo || '/admin')
+      } else if (returnTo) {
+        navigate(returnTo)
+      } else if (isComplete) {
         navigate('/recommend')
       } else {
         navigate('/taste')
@@ -466,8 +490,9 @@ function LoginPage() {
               <ShowPasswordBtn
                 type="button"
                 onClick={() => setShowPass((prev) => !prev)}
+                aria-label={showPass ? 'Hide password' : 'Show password'}
               >
-                {showPass ? 'hide' : 'show'}
+                {showPass ? <EyeOffIcon /> : <EyeIcon />}
               </ShowPasswordBtn>
             </PasswordInputWrap>
             {errors.password && <ErrorText>{errors.password}</ErrorText>}
@@ -483,7 +508,7 @@ function LoginPage() {
           <Divider><span>or</span></Divider>
 
           <RegisterPrompt>
-            don't have an account? <Link to="/register">create one</Link>
+            don't have an account? <Link to={`/register${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}>create one</Link>
           </RegisterPrompt>
 
         </Form>

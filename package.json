@@ -6,8 +6,8 @@
     "server": "(lsof -ti:5001 | xargs kill -9 2>/dev/null || true) && cd server && npm run dev",
     "dev": "concurrently \"npm run client\" \"npm run server\""
   },
-
   "dependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "nodemailer": "^9.0.3"
   }
 }

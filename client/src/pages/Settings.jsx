@@ -1,0 +1,1825 @@
+import { useState, useEffect, useRef } from 'react'
+import styled, { keyframes } from 'styled-components'
+import { Link, useNavigate } from 'react-router-dom'
+import api, { matchingAPI, safetyAPI } from '../services/api'
+import { getAuthStatus } from '../utils/auth'
+import { useTasteProfile } from '../hooks/useTasteProfile'
+import UserAvatar from '../components/UserAvatar'
+
+// ─── Professional SVG Icons ───────────────────────────────────────────────────
+
+const BlockIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+  </svg>
+)
+
+const UserIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+)
+
+const LockIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+)
+
+const ShieldAlertIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+)
+
+const EditIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+)
+
+const CameraIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+)
+
+const TrashIcon = ({ size = 13 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+)
+
+const SettingsGearIcon = ({ size = 22 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: 'block', flexShrink: 0 }}
+  >
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+)
+
+const TwinIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
+// ─── Styled Components ────────────────────────────────────────────────────────
+
+const PageWrapper = styled.main`
+  width: 100%;
+  min-height: 100vh;
+  background: #efefef;
+  display: flex;
+  flex-direction: column;
+`
+
+const Topbar = styled.header`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.75rem;
+  border-bottom: 1.5px solid #ddd;
+  background: #efefef;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+`
+
+const Logo = styled(Link)`
+  font-family: 'kare', 'Playfair Display', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  &:hover { opacity: 0.85; }
+`
+
+const PageBody = styled.div`
+  flex: 1;
+  padding: 1.25rem 2rem 4.5rem;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  @media (max-width: 768px) { padding: 1rem 1rem 4.5rem; }
+`
+
+const Breadcrumb = styled.nav`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.76rem;
+  color: #888;
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  a {
+    color: #666;
+    text-decoration: none;
+    &:hover { color: #ff751f; text-decoration: underline; }
+  }
+
+  span.active {
+    color: #111;
+    font-weight: 600;
+  }
+`
+
+const HeaderSection = styled.div`
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.75rem;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1.5px solid #ddd;
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    align-items: flex-start;
+  }
+`
+
+const PageHeading = styled.h1`
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.5rem, 2.4vw, 1.95rem);
+  font-weight: 700;
+  color: #111;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  line-height: 1.1;
+
+  span.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ff751f;
+  }
+`
+
+const PageSub = styled.p`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.84rem;
+  color: #666;
+  margin: 0;
+`
+
+const LayoutGrid = styled.div`
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.75rem;
+  align-items: flex-start;
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+`
+
+// ─── Left Sidebar Tabs ───
+
+const SidebarTabs = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 0.6rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+
+  @media (max-width: 860px) {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0.5rem;
+  }
+`
+
+const TabButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+  font-weight: ${({ $active }) => ($active ? '700' : '500')};
+  background: ${({ $active }) => ($active ? '#111827' : 'transparent')};
+  color: ${({ $active }) => ($active ? '#fff' : '#4b5563')};
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+
+  span.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: ${({ $active }) => ($active ? '#ff751f' : '#9ca3af')};
+    transition: color 0.15s ease;
+  }
+
+  &:hover {
+    background: ${({ $active }) => ($active ? '#111827' : '#f3f4f6')};
+    color: ${({ $active }) => ($active ? '#fff' : '#111')};
+
+    span.icon {
+      color: ${({ $active }) => ($active ? '#ff751f' : '#111')};
+    }
+  }
+`
+
+// ─── Right Content Area ───
+
+const ContentArea = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+`
+
+// Hero Profile Banner
+const HeroBanner = styled.div`
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0d1b2a 100%);
+  border-radius: 14px;
+  padding: 2rem 2.2rem;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -40px;
+    top: -40px;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(255,117,31,0.18) 0%, rgba(255,117,31,0) 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.5rem;
+  }
+`
+
+const HeroAvatarWrapper = styled.div`
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+`
+
+const HeroAvatar = styled.div`
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3.5px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    border-color: #ff751f;
+    transform: scale(1.02);
+  }
+`
+
+const HeroAvatarImg = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+`
+
+const AvatarOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(2px);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+
+  ${HeroAvatar}:hover & {
+    opacity: 1;
+  }
+`
+
+const OnlineBadge = styled.span`
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2.5px solid #0f172a;
+  z-index: 2;
+`
+
+const RemovePhotoBtn = styled.button`
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.12);
+  }
+`
+
+const HeroDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0.35rem;
+  z-index: 1;
+`
+
+const HeroName = styled.h2`
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-align: left;
+`
+
+const HeroBadges = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.15rem;
+`
+
+const HeroBadge = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: ${({ $accent }) => ($accent ? 'rgba(255, 117, 31, 0.16)' : 'rgba(255, 255, 255, 0.08)')};
+  color: ${({ $accent }) => ($accent ? '#ff9d5c' : '#cbd5e1')};
+  border: 1px solid ${({ $accent }) => ($accent ? 'rgba(255, 117, 31, 0.32)' : 'rgba(255, 255, 255, 0.14)')};
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.3;
+`
+
+// Information Grid
+const InfoGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const Card = styled.div`
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 1.35rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+`
+
+const CardHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid #f0f0f0;
+`
+
+const CardTitle = styled.h3`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #888;
+  margin: 0;
+`
+
+const DataRow = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.85rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`
+
+const DataLabel = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #999;
+`
+
+const DataValue = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #111;
+`
+
+// Toggle Components
+const ToggleContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+
+  @media (max-width: 600px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+`
+
+const ToggleSwitch = styled.label`
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: pointer;
+`
+
+const ToggleSlider = styled.span`
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: ${({ $checked }) => ($checked ? '#ff751f' : '#d1d5db')};
+  transition: 0.25s ease;
+  border-radius: 26px;
+
+  &:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transform: ${({ $checked }) => ($checked ? 'translateX(22px)' : 'translateX(0)')};
+  }
+`
+
+// Quick Actions
+const QuickActionsCard = styled(Card)`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`
+
+const ActionsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+`
+
+const ActionPillBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.65rem 1rem;
+  background: #f8fafc;
+  color: #1e293b;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+
+  span.icon { color: #ff751f; font-size: 0.95rem; }
+
+  &:hover {
+    background: #fff;
+    border-color: #ff751f;
+    color: #ff751f;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.04);
+  }
+`
+
+const PrimaryEditBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.7rem 1.4rem;
+  background: #111827;
+  color: #fff;
+  border: 1.5px solid #111827;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #ff751f;
+    border-color: #ff751f;
+  }
+`
+
+// Form Styles
+const FormSection = styled(Card)`
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+`
+
+const Field = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+`
+
+const Label = styled.label`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #444;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+`
+
+const Input = styled.input`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.88rem;
+  color: #111;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  outline: none;
+  transition: all 0.2s;
+  width: 100%;
+
+  &::placeholder { color: #bbb; }
+  &:focus {
+    background: #fff;
+    border-color: #ff751f;
+    box-shadow: 0 0 0 3px rgba(255, 117, 31, 0.12);
+  }
+`
+
+const PasswordInputWrap = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+`
+
+const PasswordInput = styled(Input)`
+  padding-right: 2.5rem;
+`
+
+const ShowPasswordBtn = styled.button`
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.35rem 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #111827;
+  }
+`
+
+const EyeIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const EyeOffIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+)
+
+const FormActionsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+`
+
+const SaveBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.6rem 1.3rem;
+  background: #111827;
+  color: #fff;
+  border: 1.5px solid #111827;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #ff751f;
+    border-color: #ff751f;
+  }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`
+
+const CancelBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  background: transparent;
+  color: #666;
+  border: 1.5px solid #ccc;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    color: #111;
+    border-color: #999;
+  }
+`
+
+const DangerCard = styled(Card)`
+  border: 1.5px solid #fecaca;
+  background: #fffafa;
+`
+
+const DangerTitle = styled.h3`
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: 1rem;
+  color: #991b1b;
+  margin: 0 0 0.4rem;
+`
+
+const DangerDesc = styled.p`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.8rem;
+  color: #7f1d1d;
+  line-height: 1.45;
+  margin: 0 0 1rem;
+`
+
+const DangerActionBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.6rem 1.2rem;
+  background: #dc2626;
+  color: #fff;
+  border: 1.5px solid #dc2626;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) { background: #b91c1c; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`
+
+const ErrorText = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.74rem;
+  color: #dc2626;
+`
+
+const SuccessText = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.74rem;
+  color: #16a34a;
+`
+
+const OtpBox = styled.div`
+  background: #fdfaf7;
+  border: 1.5px solid #fed7aa;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-top: 0.5rem;
+`
+
+const OtpNote = styled.p`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  color: #78350f;
+  margin: 0 0 0.75rem;
+
+  span { color: #ff751f; font-weight: 700; }
+`
+
+const BlockedList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+`
+
+const BlockedItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1.15rem;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #fff;
+    border-color: #d1d5db;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+  }
+`
+
+const BlockedUserInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+`
+
+const BlockedAvatar = styled.div`
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`
+
+const BlockedDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+`
+
+const BlockedName = styled.span`
+  font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #111;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const BlockedMeta = styled.span`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  color: #888;
+`
+
+const UnblockPillBtn = styled.button`
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.45rem 0.95rem;
+  background: #fff;
+  color: #111;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: #111827;
+    color: #fff;
+    border-color: #111827;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const EmptyBlockedState = styled.div`
+  padding: 3rem 1.5rem;
+  text-align: center;
+  background: #f9fafb;
+  border: 1.5px dashed #e5e7eb;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: #666;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.82rem;
+`
+
+// ─── Image Processing Helper ───────────────────────────────────────────────────
+
+const processImageFile = (file) => {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      return reject(new Error('Please select an image file (PNG, JPG, WebP).'))
+    }
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Failed to read image file.'))
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('Failed to parse image data.'))
+      img.onload = () => {
+        const size = 400
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+
+        const minDim = Math.min(img.width, img.height)
+        const sx = (img.width - minDim) / 2
+        const sy = (img.height - minDim) / 2
+
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+        resolve(dataUrl)
+      }
+      img.src = e.target.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+function Settings() {
+  const navigate = useNavigate()
+  const [currentUser, setCurrentUser] = useState(() => getAuthStatus().user)
+  const { tasteClusters } = useTasteProfile()
+
+  const [activeTab, setActiveTab] = useState('profile') // 'profile' | 'security' | 'taste' | 'danger'
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+
+  // Avatar upload state
+  const [avatarStatus, setAvatarStatus] = useState({ loading: false, error: '' })
+  const fileInputRef = useRef(null)
+
+  // Listen for auth updates from other components
+  useEffect(() => {
+    const handleAuthUpdate = () => {
+      setCurrentUser(getAuthStatus().user)
+    }
+    window.addEventListener('storage', handleAuthUpdate)
+    window.addEventListener('filmism_auth_update', handleAuthUpdate)
+    return () => {
+      window.removeEventListener('storage', handleAuthUpdate)
+      window.removeEventListener('filmism_auth_update', handleAuthUpdate)
+    }
+  }, [])
+
+  // Name state
+  const [name, setName] = useState({ firstName: currentUser?.firstName || '', lastName: currentUser?.lastName || '' })
+  const [nameStatus, setNameStatus] = useState({ loading: false, error: '', success: '' })
+
+  // Email state
+  const [email, setEmail] = useState(currentUser?.email || '')
+  const [emailStatus, setEmailStatus] = useState({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
+  const [emailOtp, setEmailOtp] = useState('')
+  const [otpStatus, setOtpStatus] = useState({ loading: false, error: '', success: '' })
+
+  // Password state
+  const [pwd, setPwd] = useState({ current: '', new: '', confirm: '' })
+  const [pwdStatus, setPwdStatus] = useState({ loading: false, error: '', success: '' })
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false)
+  const [showNewPwd, setShowNewPwd] = useState(false)
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false)
+
+  // Reset & stats state
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetStatus, setResetStatus] = useState({ loading: false, error: '', success: '' })
+  const [cinemaStats, setCinemaStats] = useState({ watchlistCount: 0, diaryCount: 0 })
+
+  // Cinephile Twin matching state
+  const [matchingEnabled, setMatchingEnabled] = useState(false)
+  const [matchingStatus, setMatchingStatus] = useState({ loading: false, error: '', success: '' })
+
+  // Blocked users state
+  const [blockedUsers, setBlockedUsers] = useState([])
+  const [loadingBlocked, setLoadingBlocked] = useState(false)
+  const [unblockingIds, setUnblockingIds] = useState({})
+  const [blockedStatus, setBlockedStatus] = useState({ error: '', success: '' })
+
+  const activePersonasCount = tasteClusters?.length || 0
+  const fullName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || 'Film Enthusiast'
+  const initials = ((currentUser?.firstName?.[0] || '') + (currentUser?.lastName?.[0] || '')).toUpperCase() || 'FP'
+  const userIdentifier = `FILM-${(currentUser?._id || '0000').slice(-4).toUpperCase()}`
+
+  const fetchBlockedUsers = async () => {
+    setLoadingBlocked(true)
+    setBlockedStatus({ error: '', success: '' })
+    try {
+      const res = await safetyAPI.getBlockedUsers()
+      if (res.data?.blockedUsers) {
+        setBlockedUsers(res.data.blockedUsers)
+      }
+    } catch (err) {
+      setBlockedStatus({ error: err.response?.data?.message || 'Failed to load blocked users.', success: '' })
+    } finally {
+      setLoadingBlocked(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'blocked') {
+      fetchBlockedUsers()
+    }
+  }, [activeTab])
+
+  const handleUnblockUser = async (userId, userName) => {
+    setUnblockingIds((prev) => ({ ...prev, [userId]: true }))
+    setBlockedStatus({ error: '', success: '' })
+    try {
+      await safetyAPI.unblockUser(userId)
+      setBlockedUsers((prev) => prev.filter((b) => b.blockedUser?.userId !== userId))
+      setBlockedStatus({ error: '', success: `Unblocked ${userName || 'user'} successfully.` })
+    } catch (err) {
+      setBlockedStatus({ error: err.response?.data?.message || 'Failed to unblock user.', success: '' })
+    } finally {
+      setUnblockingIds((prev) => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  // Fetch summary stats & matching status for display
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const sessionId = localStorage.getItem('filmism_session_id') || undefined
+        const [wRes, dRes, matchRes] = await Promise.allSettled([
+          api.get('/recommendations/watchlist', { params: { sessionId } }),
+          api.get('/recommendations/diary', { params: { sessionId } }),
+          matchingAPI.getCurrentMatch(),
+        ])
+        const watchlistCount = wRes.status === 'fulfilled' ? (wRes.value.data?.watchlist?.length || 0) : 0
+        const diaryCount = dRes.status === 'fulfilled' ? (dRes.value.data?.diary?.length || 0) : 0
+        setCinemaStats((prev) => ({ ...prev, watchlistCount, diaryCount }))
+
+        if (matchRes.status === 'fulfilled' && matchRes.value.data?.matchingEnabled !== undefined) {
+          setMatchingEnabled(Boolean(matchRes.value.data.matchingEnabled))
+        }
+      } catch (e) { }
+    }
+    fetchStats()
+  }, [])
+
+  const handleToggleMatching = async () => {
+    const nextVal = !matchingEnabled
+    setMatchingStatus({ loading: true, error: '', success: '' })
+    try {
+      const res = await matchingAPI.toggleOptIn(nextVal)
+      setMatchingEnabled(Boolean(res.data?.matchingEnabled))
+      setMatchingStatus({
+        loading: false,
+        error: '',
+        success: res.data?.matchingEnabled
+          ? 'Cinephile Twin matching enabled!'
+          : 'Cinephile Twin matching disabled.',
+      })
+      setTimeout(() => {
+        setMatchingStatus((prev) => ({ ...prev, success: '' }))
+      }, 4000)
+    } catch (err) {
+      setMatchingStatus({
+        loading: false,
+        error: err.response?.data?.message || 'Failed to update matching preference.',
+        success: '',
+      })
+    }
+  }
+
+  // ── Avatar Upload Handlers ──
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setAvatarStatus({ loading: true, error: '' })
+    try {
+      const dataUrl = await processImageFile(file)
+      const res = await api.patch('/auth/profile', { profilePicture: dataUrl })
+      if (res.data?.token) localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
+      setAvatarStatus({ loading: false, error: '' })
+    } catch (err) {
+      setAvatarStatus({
+        loading: false,
+        error: err.response?.data?.message || err.message || 'Failed to upload photo.',
+      })
+    } finally {
+      if (e.target) e.target.value = ''
+    }
+  }
+
+  const handleRemovePhoto = async () => {
+    setAvatarStatus({ loading: true, error: '' })
+    try {
+      const res = await api.patch('/auth/profile', { profilePicture: null })
+      if (res.data?.token) localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
+      setAvatarStatus({ loading: false, error: '' })
+    } catch (err) {
+      setAvatarStatus({
+        loading: false,
+        error: err.response?.data?.message || 'Failed to remove photo.',
+      })
+    }
+  }
+
+  // ── Reset & Close Profile Editor ──
+  const handleCloseEditor = () => {
+    setIsEditingProfile(false)
+    setName({ firstName: currentUser?.firstName || '', lastName: currentUser?.lastName || '' })
+    setEmail(currentUser?.email || '')
+    setNameStatus({ loading: false, error: '', success: '' })
+    setEmailStatus({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
+    setEmailOtp('')
+    setOtpStatus({ loading: false, error: '', success: '' })
+  }
+
+  // ── Cancel Pending Email Change ──
+  const handleCancelEmailChange = () => {
+    setEmail(currentUser?.email || '')
+    setEmailStatus({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
+    setEmailOtp('')
+    setOtpStatus({ loading: false, error: '', success: '' })
+  }
+
+  // ── Save Name ──
+  const handleSaveName = async () => {
+    if (!name.firstName.trim() || !name.lastName.trim()) {
+      setNameStatus({ loading: false, error: 'Both fields are required.', success: '' })
+      return
+    }
+    setNameStatus({ loading: true, error: '', success: '' })
+    try {
+      const res = await api.patch('/auth/profile', { firstName: name.firstName, lastName: name.lastName })
+      localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
+      setNameStatus({ loading: false, error: '', success: 'Name updated successfully.' })
+    } catch (err) {
+      setNameStatus({ loading: false, error: err.response?.data?.message || 'Failed to update name.', success: '' })
+    }
+  }
+
+  // ── Save Email ──
+  const handleSaveEmail = async () => {
+    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+      setEmailStatus({ ...emailStatus, error: 'Enter a valid email address.', success: '' })
+      return
+    }
+    if (email.toLowerCase() === currentUser?.email) {
+      setEmailStatus({ ...emailStatus, error: 'That is already your current email.', success: '' })
+      return
+    }
+    setEmailStatus({ loading: true, error: '', success: '', pendingVerify: false, pendingEmail: '' })
+    try {
+      const res = await api.patch('/auth/profile', { email })
+      if (res.data.emailChangePending) {
+        setEmailStatus({ loading: false, error: '', success: '', pendingVerify: true, pendingEmail: res.data.pendingEmail })
+      } else {
+        localStorage.setItem('token', res.data.token)
+        localStorage.setItem('user', JSON.stringify(res.data))
+        setCurrentUser(res.data)
+        window.dispatchEvent(new Event('filmism_auth_update'))
+        setEmailStatus({ loading: false, error: '', success: 'Email updated.', pendingVerify: false, pendingEmail: '' })
+      }
+    } catch (err) {
+      setEmailStatus({ loading: false, error: err.response?.data?.message || 'Failed to update email.', success: '', pendingVerify: false, pendingEmail: '' })
+    }
+  }
+
+  // ── Verify OTP for Email Change ──
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp.trim() || emailOtp.length !== 6) {
+      setOtpStatus({ loading: false, error: 'Enter the 6-digit verification code.', success: '' })
+      return
+    }
+    setOtpStatus({ loading: true, error: '', success: '' })
+    try {
+      const res = await api.post('/auth/verify-email-change', { otp: emailOtp })
+      localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
+      setEmailStatus({ loading: false, error: '', success: `Email changed to ${res.data.email}.`, pendingVerify: false, pendingEmail: '' })
+      setEmailOtp('')
+      setOtpStatus({ loading: false, error: '', success: '' })
+    } catch (err) {
+      setOtpStatus({ loading: false, error: err.response?.data?.message || 'Invalid or expired code.', success: '' })
+    }
+  }
+
+  // ── Save Password ──
+  const handleSavePassword = async () => {
+    if (!pwd.current || !pwd.new || !pwd.confirm) {
+      setPwdStatus({ loading: false, error: 'All password fields are required.', success: '' })
+      return
+    }
+    if (pwd.new !== pwd.confirm) {
+      setPwdStatus({ loading: false, error: 'New passwords do not match.', success: '' })
+      return
+    }
+    if (pwd.new.length < 8) {
+      setPwdStatus({ loading: false, error: 'New password must be at least 8 characters.', success: '' })
+      return
+    }
+    if (!/[A-Z]/.test(pwd.new)) {
+      setPwdStatus({ loading: false, error: 'New password must contain at least one uppercase letter.', success: '' })
+      return
+    }
+    if (!/\d/.test(pwd.new)) {
+      setPwdStatus({ loading: false, error: 'New password must contain at least one number.', success: '' })
+      return
+    }
+    if (!/[^A-Za-z0-9]/.test(pwd.new)) {
+      setPwdStatus({ loading: false, error: 'New password must contain at least one special character.', success: '' })
+      return
+    }
+    setPwdStatus({ loading: true, error: '', success: '' })
+    try {
+      const res = await api.patch('/auth/profile', { currentPassword: pwd.current, newPassword: pwd.new })
+      localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data))
+      setCurrentUser(res.data)
+      window.dispatchEvent(new Event('filmism_auth_update'))
+      setPwd({ current: '', new: '', confirm: '' })
+      setPwdStatus({ loading: false, error: '', success: 'Password changed successfully.' })
+    } catch (err) {
+      setPwdStatus({ loading: false, error: err.response?.data?.message || 'Failed to change password.', success: '' })
+    }
+  }
+
+  // ── Reset Taste Profile ──
+  const handleResetTasteProfile = async () => {
+    setResetStatus({ loading: true, error: '', success: '' })
+    try {
+      const res = await api.post('/auth/reset-taste')
+      if (res.data?.token) {
+        localStorage.setItem('token', res.data.token)
+        localStorage.setItem('user', JSON.stringify(res.data))
+        setCurrentUser(res.data)
+        window.dispatchEvent(new Event('filmism_auth_update'))
+      }
+      setResetStatus({ loading: false, error: '', success: 'Taste profile reset. Redirecting to onboarding...' })
+      setTimeout(() => {
+        navigate('/taste')
+      }, 900)
+    } catch (err) {
+      setResetStatus({ loading: false, error: err.response?.data?.message || 'Failed to reset taste profile.', success: '' })
+    }
+  }
+
+  return (
+    <PageWrapper>
+      <Topbar>
+        <Logo to={currentUser?.role === 'admin' ? '/admin' : '/recommend'}>Filmism</Logo>
+        <UserAvatar />
+      </Topbar>
+
+      <PageBody>
+        <Breadcrumb>
+          <Link to={currentUser?.role === 'admin' ? '/admin' : '/recommend'}>
+            {currentUser?.role === 'admin' ? 'Admin Panel' : 'Dashboard'}
+          </Link>
+          <span>›</span>
+          <span className="active">Settings</span>
+        </Breadcrumb>
+
+        <HeaderSection>
+          <PageHeading>
+            <span className="icon"><SettingsGearIcon size={22} /></span> Settings
+          </PageHeading>
+          <PageSub>
+            {currentUser?.role === 'admin'
+              ? 'Manage your administrator account credentials and security settings'
+              : 'Manage your profile, cinematic preferences and account settings'}
+          </PageSub>
+        </HeaderSection>
+
+        <LayoutGrid>
+          {/* Left Tabs */}
+          <SidebarTabs>
+            <TabButton
+              $active={activeTab === 'profile'}
+              onClick={() => { setActiveTab('profile'); handleCloseEditor(); }}
+            >
+              <span className="icon"><UserIcon size={16} /></span> Profile
+            </TabButton>
+            <TabButton
+              $active={activeTab === 'security'}
+              onClick={() => { setActiveTab('security'); handleCloseEditor(); }}
+            >
+              <span className="icon"><LockIcon size={16} /></span> Security
+            </TabButton>
+            <TabButton
+              $active={activeTab === 'blocked'}
+              onClick={() => { setActiveTab('blocked'); handleCloseEditor(); }}
+              id="settings-blocked-tab-btn"
+            >
+              <span className="icon"><BlockIcon size={16} /></span> Blocked Users
+            </TabButton>
+            {currentUser?.role !== 'admin' && (
+              <TabButton
+                $active={activeTab === 'danger'}
+                onClick={() => setActiveTab('danger')}
+              >
+                <span className="icon"><ShieldAlertIcon size={16} /></span> Reset Profile
+              </TabButton>
+            )}
+          </SidebarTabs>
+
+          {/* Right Content */}
+          <ContentArea>
+            {/* ── TAB 1: PROFILE ── */}
+            {activeTab === 'profile' && (
+              <>
+                {/* Hero Banner */}
+                <HeroBanner>
+                  <HeroAvatarWrapper>
+                    <div style={{ position: 'relative' }}>
+                      <HeroAvatar
+                        id="settings-avatar-btn"
+                        onClick={handleAvatarClick}
+                        title="Click to change profile picture"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAvatarClick() }}
+                      >
+                        {currentUser?.profilePicture ? (
+                          <HeroAvatarImg src={currentUser.profilePicture} alt={fullName} />
+                        ) : (
+                          initials
+                        )}
+                        <AvatarOverlay>
+                          <CameraIcon size={16} />
+                          <span>{currentUser?.profilePicture ? 'Change' : 'Upload'}</span>
+                        </AvatarOverlay>
+                      </HeroAvatar>
+                      <OnlineBadge />
+                    </div>
+
+                    {currentUser?.profilePicture && (
+                      <RemovePhotoBtn
+                        id="remove-photo-btn"
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        disabled={avatarStatus.loading}
+                        title="Remove profile picture"
+                      >
+                        <TrashIcon size={12} /> remove
+                      </RemovePhotoBtn>
+                    )}
+
+                    {avatarStatus.loading && (
+                      <span style={{ fontSize: '0.68rem', color: '#ff751f', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        Updating...
+                      </span>
+                    )}
+                    {avatarStatus.error && (
+                      <span style={{ fontSize: '0.68rem', color: '#dc2626', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        {avatarStatus.error}
+                      </span>
+                    )}
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept="image/png,image/jpeg,image/webp,image/jpg"
+                      style={{ display: 'none' }}
+                      id="profile-picture-input"
+                    />
+                  </HeroAvatarWrapper>
+                  <HeroDetails>
+                    <HeroName>{fullName}</HeroName>
+                    <HeroBadges>
+                      {currentUser?.role === 'admin' ? (
+                        <>
+                          <HeroBadge $accent={true}>Administrator</HeroBadge>
+                          <HeroBadge>Staff Account</HeroBadge>
+                          <HeroBadge>ID: #{userIdentifier}</HeroBadge>
+                        </>
+                      ) : (
+                        <>
+                          <HeroBadge $accent={true}>Cinephile</HeroBadge>
+                          <HeroBadge>ID: #{userIdentifier}</HeroBadge>
+                          <HeroBadge>{activePersonasCount > 0 ? `${activePersonasCount} Personas Active` : 'Active Taste Profile'}</HeroBadge>
+                        </>
+                      )}
+                    </HeroBadges>
+                  </HeroDetails>
+                </HeroBanner>
+
+                {/* Information Grid */}
+                <InfoGrid style={{ gridTemplateColumns: currentUser?.role === 'admin' ? '1fr' : undefined }}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Contact Info</CardTitle>
+                    </CardHeader>
+                    <DataRow>
+                      <DataLabel>Email</DataLabel>
+                      <DataValue>{currentUser?.email || 'Not configured'}</DataValue>
+                    </DataRow>
+                    <DataRow>
+                      <DataLabel>Full Name</DataLabel>
+                      <DataValue>{fullName}</DataValue>
+                    </DataRow>
+                    <DataRow>
+                      <DataLabel>Account Status</DataLabel>
+                      <DataValue style={{ color: currentUser?.role === 'admin' ? '#ff751f' : '#10b981' }}>
+                        {currentUser?.role === 'admin' ? '● Verified Administrator' : '● Verified Cinephile'}
+                      </DataValue>
+                    </DataRow>
+                  </Card>
+
+                  {currentUser?.role !== 'admin' && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Cinema Stats</CardTitle>
+                      </CardHeader>
+                      <DataRow>
+                        <DataLabel>Watchlist</DataLabel>
+                        <DataValue>{cinemaStats.watchlistCount} films saved</DataValue>
+                      </DataRow>
+                      <DataRow>
+                        <DataLabel>Film Logs</DataLabel>
+                        <DataValue>{cinemaStats.diaryCount} films logged</DataValue>
+                      </DataRow>
+                    </Card>
+                  )}
+                </InfoGrid>
+
+                {/* Cinephile Twin Matching Section (Consumers only) */}
+                {currentUser?.role !== 'admin' && (
+                  <Card style={{ marginTop: '1.25rem' }}>
+                    <CardHeader>
+                      <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <TwinIcon size={14} /> Cinephile Twin Matching
+                      </CardTitle>
+                      {matchingEnabled ? (
+                        <HeroBadge $accent={true}>● Opted In</HeroBadge>
+                      ) : (
+                        <HeroBadge>Off</HeroBadge>
+                      )}
+                    </CardHeader>
+                    <ToggleContainer>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <span style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.92rem', fontWeight: 600, color: '#111' }}>
+                          Let other cinephiles with similar taste find you
+                        </span>
+                        <p style={{ margin: 0, fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.78rem', color: '#666', lineHeight: 1.45 }}>
+                          When enabled, our vector matching engine pairs you with cinephiles who share your aesthetic personas and film favorites. Only your first name, avatar, and taste overlap are visible to your matches. Your email and private watch data are never shared.
+                        </p>
+                      </div>
+                      <ToggleSwitch>
+                        <input
+                          type="checkbox"
+                          id="cinephile-twin-toggle"
+                          checked={matchingEnabled}
+                          onChange={handleToggleMatching}
+                          disabled={matchingStatus.loading}
+                          style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                        />
+                        <ToggleSlider $checked={matchingEnabled} onClick={handleToggleMatching} />
+                      </ToggleSwitch>
+                    </ToggleContainer>
+
+                    {matchingStatus.loading && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#ff751f', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        Updating preference...
+                      </div>
+                    )}
+                    {matchingStatus.success && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#10b981', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        {matchingStatus.success}
+                      </div>
+                    )}
+                    {matchingStatus.error && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#dc2626', fontFamily: 'Lexend Deca, sans-serif' }}>
+                        {matchingStatus.error}
+                      </div>
+                    )}
+
+                    {matchingEnabled && (
+                      <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #f0f0f0' }}>
+                        <Link
+                          to="/twin"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            fontFamily: 'Lexend Deca, sans-serif',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            color: '#ff751f',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <TwinIcon size={14} /> Meet Your Cinephile Twin →
+                        </Link>
+                      </div>
+                    )}
+                  </Card>
+                )}
+
+                {/* Quick Actions */}
+                {!isEditingProfile && (
+                  <PrimaryEditBtn onClick={() => {
+                    setName({ firstName: currentUser?.firstName || '', lastName: currentUser?.lastName || '' })
+                    setEmail(currentUser?.email || '')
+                    setEmailStatus({ loading: false, error: '', success: '', pendingVerify: false, pendingEmail: '' })
+                    setEmailOtp('')
+                    setOtpStatus({ loading: false, error: '', success: '' })
+                    setNameStatus({ loading: false, error: '', success: '' })
+                    setIsEditingProfile(true)
+                  }}>
+                    <EditIcon size={14} /> Edit Profile Information
+                  </PrimaryEditBtn>
+                )}
+
+                {/* Inline Profile Edit Form */}
+                {isEditingProfile && (
+                  <FormSection>
+                    <CardHeader>
+                      <CardTitle>Edit Account Information</CardTitle>
+                    </CardHeader>
+
+                    <Field>
+                      <Label htmlFor="editFirstName">first name</Label>
+                      <Input
+                        id="editFirstName"
+                        value={name.firstName}
+                        onChange={(e) => setName((p) => ({ ...p, firstName: e.target.value }))}
+                      />
+                    </Field>
+                    <Field>
+                      <Label htmlFor="editLastName">last name</Label>
+                      <Input
+                        id="editLastName"
+                        value={name.lastName}
+                        onChange={(e) => setName((p) => ({ ...p, lastName: e.target.value }))}
+                      />
+                    </Field>
+                    {nameStatus.error && <ErrorText>{nameStatus.error}</ErrorText>}
+                    {nameStatus.success && <SuccessText>{nameStatus.success}</SuccessText>}
+                    <SaveBtn onClick={handleSaveName} disabled={nameStatus.loading}>
+                      {nameStatus.loading ? 'Saving...' : 'Save Name'}
+                    </SaveBtn>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid #f0f0f0', margin: '0.5rem 0' }} />
+
+                    <Field>
+                      <Label htmlFor="editEmail">email address</Label>
+                      <Input
+                        id="editEmail"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                    </Field>
+                    {emailStatus.error && <ErrorText>{emailStatus.error}</ErrorText>}
+                    {emailStatus.success && <SuccessText>{emailStatus.success}</SuccessText>}
+
+                    {!emailStatus.pendingVerify && (
+                      <SaveBtn onClick={handleSaveEmail} disabled={emailStatus.loading}>
+                        {emailStatus.loading ? 'Saving...' : 'Change Email'}
+                      </SaveBtn>
+                    )}
+
+                    {emailStatus.pendingVerify && (
+                      <OtpBox>
+                        <OtpNote>
+                          A verification code was sent to <span>{emailStatus.pendingEmail}</span>. Enter it below:
+                        </OtpNote>
+                        <Field>
+                          <Label htmlFor="otpInput">6-digit code</Label>
+                          <Input
+                            id="otpInput"
+                            maxLength={6}
+                            value={emailOtp}
+                            onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ''))}
+                            placeholder="_ _ _ _ _ _"
+                          />
+                        </Field>
+                        {otpStatus.error && <ErrorText>{otpStatus.error}</ErrorText>}
+                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                          <SaveBtn onClick={handleVerifyEmailOtp} disabled={otpStatus.loading}>
+                            {otpStatus.loading ? 'Verifying...' : 'Verify & Confirm'}
+                          </SaveBtn>
+                          <CancelBtn type="button" onClick={handleCancelEmailChange} style={{ padding: '0.65rem 1rem', fontSize: '0.78rem' }}>
+                            Cancel Change
+                          </CancelBtn>
+                        </div>
+                      </OtpBox>
+                    )}
+
+                    <FormActionsRow>
+                      <CancelBtn onClick={handleCloseEditor}>
+                        Close Editor
+                      </CancelBtn>
+                    </FormActionsRow>
+                  </FormSection>
+                )}
+              </>
+            )}
+
+            {/* ── TAB 2: SECURITY ── */}
+            {activeTab === 'security' && (
+              <FormSection>
+                <CardHeader>
+                  <CardTitle>Change Password</CardTitle>
+                </CardHeader>
+                <Field>
+                  <Label htmlFor="currentPwd">current password</Label>
+                  <PasswordInputWrap>
+                    <PasswordInput
+                      id="currentPwd"
+                      type={showCurrentPwd ? 'text' : 'password'}
+                      value={pwd.current}
+                      onChange={(e) => setPwd((p) => ({ ...p, current: e.target.value }))}
+                      placeholder="Your current password"
+                    />
+                    <ShowPasswordBtn
+                      type="button"
+                      onClick={() => setShowCurrentPwd((prev) => !prev)}
+                      aria-label={showCurrentPwd ? 'Hide current password' : 'Show current password'}
+                    >
+                      {showCurrentPwd ? <EyeOffIcon /> : <EyeIcon />}
+                    </ShowPasswordBtn>
+                  </PasswordInputWrap>
+                </Field>
+                <Field>
+                  <Label htmlFor="newPwd">new password</Label>
+                  <PasswordInputWrap>
+                    <PasswordInput
+                      id="newPwd"
+                      type={showNewPwd ? 'text' : 'password'}
+                      value={pwd.new}
+                      onChange={(e) => setPwd((p) => ({ ...p, new: e.target.value }))}
+                      placeholder="Min. 8 chars, 1 uppercase, 1 special char"
+                    />
+                    <ShowPasswordBtn
+                      type="button"
+                      onClick={() => setShowNewPwd((prev) => !prev)}
+                      aria-label={showNewPwd ? 'Hide new password' : 'Show new password'}
+                    >
+                      {showNewPwd ? <EyeOffIcon /> : <EyeIcon />}
+                    </ShowPasswordBtn>
+                  </PasswordInputWrap>
+                </Field>
+                <Field>
+                  <Label htmlFor="confirmPwd">confirm new password</Label>
+                  <PasswordInputWrap>
+                    <PasswordInput
+                      id="confirmPwd"
+                      type={showConfirmPwd ? 'text' : 'password'}
+                      value={pwd.confirm}
+                      onChange={(e) => setPwd((p) => ({ ...p, confirm: e.target.value }))}
+                      placeholder="Repeat new password"
+                    />
+                    <ShowPasswordBtn
+                      type="button"
+                      onClick={() => setShowConfirmPwd((prev) => !prev)}
+                      aria-label={showConfirmPwd ? 'Hide confirm password' : 'Show confirm password'}
+                    >
+                      {showConfirmPwd ? <EyeOffIcon /> : <EyeIcon />}
+                    </ShowPasswordBtn>
+                  </PasswordInputWrap>
+                </Field>
+                {pwdStatus.error && <ErrorText>{pwdStatus.error}</ErrorText>}
+                {pwdStatus.success && <SuccessText>{pwdStatus.success}</SuccessText>}
+                <FormActionsRow>
+                  <SaveBtn onClick={handleSavePassword} disabled={pwdStatus.loading}>
+                    {pwdStatus.loading ? 'Updating...' : 'Update Password'}
+                  </SaveBtn>
+                </FormActionsRow>
+              </FormSection>
+            )}
+
+            {/* ── TAB 3: BLOCKED USERS ── */}
+            {activeTab === 'blocked' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Blocked Users</CardTitle>
+                </CardHeader>
+                <p style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', color: '#666', marginTop: 0, marginBottom: '1.25rem' }}>
+                  Users you have blocked cannot message you or view your direct connection profile. You can unblock them here at any time.
+                </p>
+
+                {blockedStatus.error && <ErrorText style={{ display: 'block', marginBottom: '1rem' }}>{blockedStatus.error}</ErrorText>}
+                {blockedStatus.success && <SuccessText style={{ display: 'block', marginBottom: '1rem' }}>{blockedStatus.success}</SuccessText>}
+
+                {loadingBlocked ? (
+                  <EmptyBlockedState>Loading blocked users...</EmptyBlockedState>
+                ) : blockedUsers.length === 0 ? (
+                  <EmptyBlockedState>
+                    <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🛡️</span>
+                    <strong style={{ color: '#111' }}>No blocked users</strong>
+                    <span>You haven't blocked any users yet.</span>
+                  </EmptyBlockedState>
+                ) : (
+                  <BlockedList>
+                    {blockedUsers.map((item) => {
+                      const u = item.blockedUser || {}
+                      const initials = (u.firstName?.[0] || 'U').toUpperCase()
+                      const isUnblocking = Boolean(unblockingIds[u.userId])
+
+                      return (
+                        <BlockedItem key={item.blockId || u.userId}>
+                          <BlockedUserInfo>
+                            <BlockedAvatar>
+                              {u.profilePicture ? (
+                                <img src={u.profilePicture} alt="" />
+                              ) : (
+                                initials
+                              )}
+                            </BlockedAvatar>
+                            <BlockedDetails>
+                              <BlockedName>{u.firstName || 'Cinephile'}</BlockedName>
+                              <BlockedMeta>
+                                {item.reason ? `Reason: ${item.reason} • ` : ''}
+                                Blocked on {new Date(item.blockedAt).toLocaleDateString()}
+                              </BlockedMeta>
+                            </BlockedDetails>
+                          </BlockedUserInfo>
+
+                          <UnblockPillBtn
+                            onClick={() => handleUnblockUser(u.userId, u.firstName)}
+                            disabled={isUnblocking}
+                            id={`unblock-btn-${u.userId}`}
+                          >
+                            {isUnblocking ? 'Unblocking...' : 'Unblock'}
+                          </UnblockPillBtn>
+                        </BlockedItem>
+                      )
+                    })}
+                  </BlockedList>
+                )}
+              </Card>
+            )}
+
+            {/* ── TAB 4: RESET PROFILE ── */}
+            {activeTab === 'danger' && (
+              <DangerCard>
+                <DangerTitle>Reset Taste Profile</DangerTitle>
+                <DangerDesc>
+                  Resetting will permanently clear your generated cinematic clusters, AI persona models, and saved favorite films. You will be redirected to build your profile from scratch.
+                </DangerDesc>
+                {resetStatus.error && <ErrorText>{resetStatus.error}</ErrorText>}
+                {resetStatus.success && <SuccessText>{resetStatus.success}</SuccessText>}
+
+                {!showResetConfirm ? (
+                  <DangerActionBtn onClick={() => setShowResetConfirm(true)}>
+                    Reset Taste Profile
+                  </DangerActionBtn>
+                ) : (
+                  <FormActionsRow style={{ marginTop: '0.75rem' }}>
+                    <DangerActionBtn onClick={handleResetTasteProfile} disabled={resetStatus.loading}>
+                      {resetStatus.loading ? 'Resetting...' : 'Yes, Permanently Reset'}
+                    </DangerActionBtn>
+                    <CancelBtn onClick={() => setShowResetConfirm(false)} disabled={resetStatus.loading}>
+                      Cancel
+                    </CancelBtn>
+                  </FormActionsRow>
+                )}
+              </DangerCard>
+            )}
+          </ContentArea>
+        </LayoutGrid>
+      </PageBody>
+    </PageWrapper>
+  )
+}
+
+export default Settings

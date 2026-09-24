@@ -1,5 +1,5 @@
 const mongoose = require('mongoose')
-const bcrypt   = require('bcryptjs')
+const bcrypt = require('bcryptjs')
 
 const userSchema = new mongoose.Schema(
   {
@@ -21,17 +21,46 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/\S+@\S+\.\S+/, 'Please enter a valid email'],
     },
+    // Holds a new email address while awaiting OTP verification before committing
+    pendingEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
+    },
     password: {
       type: String,
       required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters'],
+      minlength: [8, 'Password must be at least 8 characters'],
     },
 
+    isVerified: { type: Boolean, default: false },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+      index: true,
+    },
+    isBanned: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    bannedReason: { type: String, default: null },
+    bannedAt: { type: Date, default: null },
+    otp: { type: String },
+    otpExpiry: { type: Date },
+    otpAttempts: { type: Number, default: 0 },
+    otpLastSentAt: { type: Date, default: null },
+    profilePicture: { type: String, default: null },
+
+
     // Taste profile — filled in after register
-    selectedCinemas:  { type: [String], default: [] },
-    selectedGenres:   { type: [String], default: [] },
-    selectedPosters:  { type: [String], default: [] },
-    aestheticProfile: { type: Object,   default: null },
+    tasteProfileComplete: { type: Boolean, default: false },
+    selectedCinemas: { type: [Number], default: [] }, // local Filmism cinema IDs (1–8)
+    selectedGenres: { type: [Number], default: [] }, // TMDB genre IDs
+    selectedPosters: { type: [Number], default: [] }, // TMDB film IDs
+    aestheticProfile: { type: Object, default: null },
   },
   { timestamps: true }
 )
