@@ -6,8 +6,8 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas%20Vector-47a248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
-> **"Not an algorithm. A taste profile built from the posters that pull you in."**  
-> Filmism is a full-stack, cloud-deployed cinema discovery platform that constructs multi-cluster aesthetic taste profiles from visual poster curation, vector mathematical modeling, and AI-driven craftsmanship synthesis.
+> **"Discover films that feel like you."**  
+> Filmism is a full-stack, cloud-deployed cinema discovery platform that constructs multi-cluster taste profiles from your chosen **genres**, **global cinema origins**, and **favorite rated films**, powered by vector mathematical modeling and AI-driven craftsmanship synthesis.
 
 ---
 
@@ -21,10 +21,12 @@
 
 ## 🌟 Key Features
 
-### 🎨 Visual Aesthetic Taste Profiling
-* **Poster-Driven Onboarding**: Interactive multi-step curation across global cinema origins (Hollywood, French, Japanese, Scandinavian, Indian Cinema, etc.), genres, and curated film posters.
-* **Semantic Taste Clustering**: Partitions user selections into distinct mathematical clusters (e.g. *Atmospheric Neo-Noir & Psychological Tension*, *Intimate Romantic Melancholia*).
-* **AI Synthesis**: Generates personalized natural language rationales evaluating film craftsmanship, directorial signatures, and emotional resonance using generative AI models.
+### 🎯 3-Step Taste Profiling Onboarding
+* **Step 1: Genres**: Select your preferred cinematic genres (Drama, Thriller, Sci-Fi, Romance, etc.).
+* **Step 2: Cinema Origins**: Choose from global cinematic traditions (Hollywood, French Cinema, Japanese Cinema, Indian Cinema, Scandinavian Cinema, etc.).
+* **Step 3: Favorite Films & Ratings**: Dynamically discovers and recommends films tailored to your chosen genres and origins, allowing you to curate and rate your favorite films (1–4 rating scale).
+* **Step 4: Semantic Taste Clusters**: The vector engine partitions your selections into distinct mathematical taste personas (e.g. *Atmospheric Neo-Noir & Psychological Tension*, *Intimate Romantic Melancholia*).
+* **AI Craftsmanship Synthesis**: Generates personalized natural language rationales evaluating storytelling craftsmanship, directorial signatures, and emotional themes using generative AI.
 
 ### ⚡ Hybrid Recommendation Engine
 * **Vector Matching (<50ms)**: Fast-path vector similarity matching using normalized centroid embeddings stored directly in MongoDB.
