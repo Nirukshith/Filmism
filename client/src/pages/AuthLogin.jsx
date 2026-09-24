@@ -415,6 +415,11 @@ function LoginPage() {
       const response = await authAPI.login({ email: form.email, password: form.password })
 
       if (response.data.token) {
+        try {
+          sessionStorage.removeItem('filmism_dashboard_recs')
+          sessionStorage.removeItem('filmism_watched_outcomes')
+          sessionStorage.removeItem('filmism_profile_ratings')
+        } catch (e) {}
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data))
         localStorage.setItem('filmism_rotate_cache', 'true')  // rotate cached recommendations on login

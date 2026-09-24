@@ -256,6 +256,11 @@ function UserAvatar() {
     localStorage.removeItem('filmism_taste_clusters')
     localStorage.removeItem('filmism_ai_synthesis')
     localStorage.removeItem('filmism_pending_onboarding')
+    try {
+      sessionStorage.removeItem('filmism_dashboard_recs')
+      sessionStorage.removeItem('filmism_watched_outcomes')
+      sessionStorage.removeItem('filmism_profile_ratings')
+    } catch (e) {}
     window.dispatchEvent(new Event('filmism_auth_update'))
     navigate('/')
   }

@@ -103,10 +103,43 @@ export function TasteProvider({ children }) {
     }
   }, [sessionId])
 
+  const [activeUserId, setActiveUserId] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user'))
+      return u?._id || u?.id || null
+    } catch {
+      return null
+    }
+  })
+
   // Load initial profile data from logged-in user or session if saved in localStorage
   const reloadFromStorage = () => {
     const storedUser = localStorage.getItem('user')
     const pendingOnboarding = localStorage.getItem('filmism_pending_onboarding')
+    let currentId = null
+
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser)
+        currentId = user?._id || user?.id || null
+      } catch {}
+    }
+
+    // When switching accounts or logging out, purge cached recommendations from previous user
+    if (activeUserId !== currentId) {
+      setActiveUserId(currentId)
+      setDashboardRecs(null)
+      setDashboardTelemetry(null)
+      setDashboardHasMore(true)
+      setDashboardPage(1)
+      setCachedWatchedOutcomes({})
+      setCachedProfileRatings({})
+      try {
+        sessionStorage.removeItem('filmism_dashboard_recs')
+        sessionStorage.removeItem('filmism_watched_outcomes')
+        sessionStorage.removeItem('filmism_profile_ratings')
+      } catch {}
+    }
 
     if (storedUser) {
       try {
