@@ -67,6 +67,19 @@ const ShieldIcon = ({ size = 14 }) => (
   </svg>
 )
 
+const FilmStripIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+    <line x1="7" y1="2" x2="7" y2="22" />
+    <line x1="17" y1="2" x2="17" y2="22" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <line x1="2" y1="7" x2="7" y2="7" />
+    <line x1="2" y1="17" x2="7" y2="17" />
+    <line x1="17" y1="17" x2="22" y2="17" />
+    <line x1="17" y1="7" x2="22" y2="7" />
+  </svg>
+)
+
 const fadeSlide = keyframes`
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -188,6 +201,26 @@ const DropItem = styled(Link)`
   }
 `
 
+const MobileDropItem = styled(DropItem)`
+  display: none;
+
+  @media (max-width: 768px) {
+    display: flex;
+    color: #ff751f;
+    font-weight: 600;
+
+    .icon {
+      color: #ff751f;
+      opacity: 1;
+    }
+
+    &:hover {
+      background: rgba(255, 117, 31, 0.08);
+      color: #e6600c;
+    }
+  }
+`
+
 const DropDivider = styled.hr`
   border: none;
   border-top: 1px solid #f0f0f0;
@@ -296,6 +329,10 @@ function UserAvatar() {
                     <span className="icon" style={{ color: '#ff751f' }}><ShieldIcon size={14} /></span>
                     admin panel
                   </DropItem>
+                  <MobileDropItem to="/taste?mode=continue" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><FilmStripIcon size={14} /></span>
+                    continue build profile
+                  </MobileDropItem>
                   <DropItem to="/settings" onClick={() => setOpen(false)} role="menuitem">
                     <span className="icon"><SettingsIcon size={14} /></span>
                     settings
@@ -307,6 +344,10 @@ function UserAvatar() {
                     <span className="icon"><DashboardIcon size={14} /></span>
                     dashboard
                   </DropItem>
+                  <MobileDropItem to="/taste?mode=continue" onClick={() => setOpen(false)} role="menuitem">
+                    <span className="icon"><FilmStripIcon size={14} /></span>
+                    continue build profile
+                  </MobileDropItem>
                   <DropItem to="/watchlist" onClick={() => setOpen(false)} role="menuitem">
                     <span className="icon"><WatchlistIcon size={14} /></span>
                     watchlist

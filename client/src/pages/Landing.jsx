@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
-import ryanImage from '../assets/ryan.png'
-import emmaImage from '../assets/emma.png'
+import ryanImage from '../assets/ryan.webp'
+import emmaImage from '../assets/emma.webp'
 
 const PageWrapper = styled.main`
   width: 100%;
@@ -97,26 +97,35 @@ const RyanPortrait = styled(BasePortrait)`
 `;
 
 const EmmaPortrait = styled(BasePortrait)`
-  right: 0;
+  right: -3vw;
   width: 40vw;
   background-image: url(${emmaImage});
   background-position: right bottom;
+
+  @media (max-width: 1200px) {
+    right: -2vw;
+  }
 `;
 
 const CentralContent = styled.section`
   position: absolute;
-  top: 50%;
+  top: calc(50% + 0.75rem);
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
   z-index: 10;
-  width: min(92vw, 840px);
-  padding: 0 1rem;
+  width: fit-content;
+  max-width: 94vw;
+  padding: 0;
+
+  @media (max-width: 640px) {
+    top: calc(50% + 0.45rem);
+  }
 `
 
 const MainLogo = styled.h1`
   font-family: 'Kare', 'Playfair Display', Georgia, serif;
-  font-size: clamp(3rem, 11vw, 6.2rem);
+  font-size: clamp(3.2rem, 12vw, 6.8rem);
   font-weight: 700;
   line-height: 1;
   margin: 0;
@@ -124,33 +133,29 @@ const MainLogo = styled.h1`
   letter-spacing: -0.01em;
   color: #111;
   text-transform: uppercase;
+  white-space: nowrap;
 `
 
 const Subtitle = styled.p`
   position: absolute;
-  top: calc(100% + 0.85rem);
-  left: 50%;
-  transform: translateX(-50%);
+  top: calc(100% - 1.05rem);
+  left: 0;
   width: 100%;
-  max-width: 90vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-family: 'Lexend Deca', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  font-size: clamp(0.78rem, 2.2vw, 1.15rem);
+  font-size: clamp(0.85rem, 2.7vw, 1.35rem);
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.04em;
   color: #111;
   margin: 0;
   padding: 0;
-  text-align: center;
-  white-space: nowrap;
+  box-sizing: border-box;
 
   @media (max-width: 640px) {
-    font-size: clamp(0.72rem, 3.2vw, 0.92rem);
-    letter-spacing: 0.08em;
-    top: calc(100% + 0.65rem);
-  }
-
-  @media (max-width: 340px) {
-    white-space: normal;
+    font-size: clamp(0.76rem, 2.8vw, 1.05rem);
+    top: calc(100% - 0.75rem);
   }
 `
 
@@ -189,7 +194,14 @@ function LandingPage() {
 
       <CentralContent>
         <MainLogo>Filmism</MainLogo>
-        <Subtitle>Discover films that feel like you</Subtitle>
+        <Subtitle>
+          <span>Discover</span>
+          <span>films</span>
+          <span>that</span>
+          <span>feel</span>
+          <span>like</span>
+          <span>you</span>
+        </Subtitle>
       </CentralContent>
     </PageWrapper>
   )

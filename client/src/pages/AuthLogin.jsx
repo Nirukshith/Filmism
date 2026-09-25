@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import styled from 'styled-components'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import loginPoster from '../assets/loginposter.png'
+import loginPoster from '../assets/loginposter.webp'
 import { authAPI } from '../services/api'
 import { useTasteProfile } from '../hooks/useTasteProfile'
 

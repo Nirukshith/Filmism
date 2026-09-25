@@ -92,23 +92,6 @@ const TopbarRight = styled.div`
   }
 `
 
-const NavLink = styled(Link)`
-  font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #444;
-  text-decoration: none;
-  text-transform: lowercase;
-  transition: color 0.15s;
-
-  @media (max-width: 768px) {
-    display: none;
-  }
-
-  &:hover {
-    color: #ff751f;
-  }
-`
 
 const ChatLayout = styled.div`
   flex: 1;
@@ -924,9 +907,6 @@ export default function Messages() {
       <Topbar>
         <Logo to="/recommend">FILMISM</Logo>
         <TopbarRight>
-          <NavLink to="/recommend">Dashboard</NavLink>
-          <NavLink to="/twin">Cinephile Twin</NavLink>
-          <NavLink to="/diary">Diary</NavLink>
           <UserAvatar />
         </TopbarRight>
       </Topbar>
