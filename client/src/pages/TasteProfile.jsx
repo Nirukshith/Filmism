@@ -53,7 +53,7 @@ const Topbar = styled.header`
   position: sticky;
   top: 0;
   z-index: 30;
-  @media (max-width: 640px) { padding: 1rem 1.25rem; }
+  @media (max-width: 640px) { padding: 0.75rem 1rem; }
 `
 
 const Logo = styled.span`
@@ -64,13 +64,41 @@ const Logo = styled.span`
   letter-spacing: -0.01em;
   user-select: none;
   cursor: default;
+
+  @media (max-width: 480px) {
+    font-size: 1.25rem;
+  }
 `
 
 const StepIndicator = styled.div`
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  @media (max-width: 480px) { display: none; }
+  @media (max-width: 600px) { display: none; }
+`
+
+const MobileStepBadge = styled.div`
+  display: none;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  border: 1.5px solid #ddd;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-family: 'Lexend Deca', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #333;
+  text-transform: lowercase;
+
+  span {
+    color: #ff751f;
+    font-weight: 700;
+  }
+
+  @media (max-width: 600px) {
+    display: inline-flex;
+  }
 `
 
 const StepItem = styled.div`
@@ -106,6 +134,10 @@ const StepLabel = styled.span`
   color: ${({ $active, $done }) => $done ? '#3b8b4b' : $active ? '#111' : '#bbb'};
   font-weight: ${({ $active }) => ($active ? '600' : '400')};
   text-transform: lowercase;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `
 
 const StepLine = styled.div`
@@ -113,6 +145,10 @@ const StepLine = styled.div`
   height: 1.5px;
   background: ${({ $done }) => ($done ? '#3b8b4b' : '#ddd')};
   transition: background 0.3s;
+
+  @media (max-width: 768px) {
+    width: 14px;
+  }
 `
 
 const PageBody = styled.div`
@@ -381,6 +417,18 @@ const DecadeFilterRow = styled.div`
   gap: 0.4rem;
   flex-wrap: wrap;
   margin-bottom: 0.75rem;
+
+  @media (max-width: 640px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 `
 
 const DecadeLabel = styled.span`
@@ -389,6 +437,7 @@ const DecadeLabel = styled.span`
   color: #888;
   font-weight: 500;
   margin-right: 0.2rem;
+  flex-shrink: 0;
 `
 
 const DecadePill = styled.button`
@@ -403,6 +452,8 @@ const DecadePill = styled.button`
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &:hover {
     border-color: #ff751f;
@@ -582,6 +633,7 @@ const PaginationBar = styled.div`
   justify-content: center;
   gap: 0.35rem;
   margin: 1.5rem 0 2rem;
+  flex-wrap: wrap;
 `
 
 const PageBtn = styled.button`
@@ -749,7 +801,7 @@ const BottomBar = styled.footer`
   align-items: center;
   justify-content: space-between;
   z-index: 30;
-  @media (max-width: 640px) { padding: 0.85rem 1.25rem; }
+  @media (max-width: 640px) { padding: 0.75rem 1rem; }
 `
 
 const BottomHint = styled.div`
@@ -765,6 +817,11 @@ const BtnRow = styled.div`
   align-items: center;
   gap: 0.75rem;
   margin-left: auto;
+
+  @media (max-width: 520px) {
+    width: 100%;
+    justify-content: space-between;
+  }
 `
 
 const BackBtn = styled.button`
@@ -779,6 +836,14 @@ const BackBtn = styled.button`
   text-transform: lowercase;
   border-radius: 4px;
   transition: all 0.2s;
+  min-height: 42px;
+
+  @media (max-width: 520px) {
+    flex: 1;
+    padding: 0.65rem 0.75rem;
+    text-align: center;
+  }
+
   &:hover { border-color: #111; color: #111; }
 `
 
@@ -795,6 +860,14 @@ const NextBtn = styled.button`
   letter-spacing: 0.04em;
   transition: all 0.2s;
   border-radius: 4px;
+  min-height: 42px;
+
+  @media (max-width: 520px) {
+    flex: 1;
+    padding: 0.65rem 0.75rem;
+    text-align: center;
+  }
+
   &:hover:not(:disabled) { background: transparent; color: #111; }
   &:disabled { opacity: 0.35; cursor: not-allowed; }
 `
@@ -1312,6 +1385,9 @@ function TasteProfile() {
       <PageWrapper>
         <Topbar>
           <Logo>Filmism</Logo>
+          <MobileStepBadge>
+            <span>step {step}/4</span> · {STEPS[step - 1]?.label}
+          </MobileStepBadge>
           <StepIndicator>
             {STEPS.map((s, i) => {
               const clickable = isStepClickable(s.num)

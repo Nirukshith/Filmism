@@ -125,6 +125,10 @@ const Topbar = styled.header`
   position: sticky;
   top: 0;
   z-index: 30;
+
+  @media (max-width: 640px) {
+    padding: 0.65rem 1rem;
+  }
 `
 
 const Logo = styled.span`
@@ -135,6 +139,10 @@ const Logo = styled.span`
   letter-spacing: -0.01em;
   user-select: none;
   cursor: default;
+
+  @media (max-width: 480px) {
+    font-size: 1.25rem;
+  }
 `
 
 const TopbarRight = styled.div`
@@ -157,7 +165,7 @@ const PageBody = styled.div`
   }
 
   @media (max-width: 768px) {
-    padding: 1rem 1rem 4.5rem;
+    padding: 0.85rem 0.85rem 4.5rem;
   }
 `
 
@@ -180,7 +188,7 @@ const HeaderLeft = styled.div`
 
 const PageTitle = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.6rem, 3.2vw, 2.3rem);
+  font-size: clamp(1.4rem, 5vw, 2.3rem);
   font-weight: 700;
   color: #111;
   margin: 0;
@@ -253,9 +261,10 @@ const TwinHeroCard = styled.div`
   }
 
   @media (max-width: 768px) {
-    padding: 1.5rem;
+    padding: 1.25rem;
     flex-direction: column;
     align-items: flex-start;
+    gap: 1.25rem;
   }
 `
 
@@ -263,6 +272,10 @@ const TwinProfileSection = styled.div`
   display: flex;
   align-items: center;
   gap: 1.5rem;
+
+  @media (max-width: 480px) {
+    gap: 1rem;
+  }
 `
 
 const TwinAvatar = styled.div`
@@ -281,6 +294,12 @@ const TwinAvatar = styled.div`
   box-shadow: 0 0 20px rgba(255, 117, 31, 0.4);
   flex-shrink: 0;
   overflow: hidden;
+
+  @media (max-width: 480px) {
+    width: 60px;
+    height: 60px;
+    font-size: 1.4rem;
+  }
 
   img {
     width: 100%;
@@ -314,6 +333,10 @@ const TwinName = styled.h2`
   margin: 0;
   color: #fff;
   letter-spacing: -0.01em;
+
+  @media (max-width: 480px) {
+    font-size: 1.3rem;
+  }
 `
 
 const MatchedDate = styled.span`
@@ -433,6 +456,11 @@ const SectionCard = styled.div`
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
+
+  @media (max-width: 480px) {
+    padding: 1rem 0.85rem;
+    border-radius: 12px;
+  }
 `
 
 const CardHeader = styled.div`
@@ -532,6 +560,14 @@ const FavoritesGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 1rem;
+
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  @media (max-width: 340px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 `
 
 const FilmCard = styled.div`

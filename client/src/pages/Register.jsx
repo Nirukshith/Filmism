@@ -34,8 +34,12 @@ const LeftPanel = styled.div`
 
   @media (max-width: 768px) {
     min-height: 100vh;
-    padding: 6rem 2rem 3rem;
+    padding: 5.5rem 1.5rem 2.5rem;
     align-items: center;
+  }
+
+  @media (max-width: 480px) {
+    padding: 4.5rem 1.25rem 2rem;
   }
 `
 
@@ -58,7 +62,11 @@ const RightPanel = styled.div`
 const FormHeader = styled.div`
   width: 100%;
   max-width: 400px;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1.75rem;
+
+  @media (max-width: 480px) {
+    margin-bottom: 1.25rem;
+  }
 `
 
 const BackLink = styled(Link)`
@@ -76,6 +84,10 @@ const BackLink = styled(Link)`
   transition: opacity 0.2s;
   z-index: 2;
 
+  @media (max-width: 640px) {
+    top: 1.25rem;
+    left: 1rem;
+  }
 
   &:hover {
     opacity: 0.6;
@@ -84,7 +96,7 @@ const BackLink = styled(Link)`
 
 const FormTitle = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  font-size: clamp(1.8rem, 6vw, 3.5rem);
   font-weight: 700;
   color: #111;
   line-height: 1.05;
@@ -114,10 +126,11 @@ const FieldRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  margin-top:-2.4rem;
+  margin-top: 0;
 
   @media (max-width: 480px) {
     grid-template-columns: 1fr;
+    gap: 1.2rem;
   }
 `
 

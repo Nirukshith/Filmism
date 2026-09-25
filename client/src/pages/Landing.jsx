@@ -25,9 +25,10 @@ const Nav = styled.nav`
   z-index: 20;
 
   @media (max-width: 640px) {
-    gap: 1.25rem;
+    gap: 1rem;
     flex-wrap: wrap;
-    padding: 0 1rem;
+    padding: 0 0.75rem;
+    margin: 1.25rem auto 0;
   }
 `
 
@@ -38,6 +39,11 @@ const NavLink = styled(Link)`
   text-decoration: none;
   text-transform: lowercase;
   transition: opacity 0.2s;
+  padding: 4px;
+
+  @media (max-width: 640px) {
+    font-size: 0.84rem;
+  }
 
   &:hover {
     opacity: 0.7;
@@ -62,34 +68,34 @@ const BottomPanel = styled.div`
 const BasePortrait = styled.div`
   position: absolute;
   bottom: 0;
-  height: 100%; /* Increased from 90% to span the whole height if needed */
+  height: 100%;
   z-index: 5;
   background-repeat: no-repeat;
-  /* Changed from contain to cover to ensure they fill the width/height of their box */
   background-size: cover; 
   pointer-events: none;
 
   @media (max-width: 900px) {
-    height: 80%;
+    height: 75%;
+    width: 35vw;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
     display: none;
   }
 `;
 
 const RyanPortrait = styled(BasePortrait)`
   left: 0;
-  width: 40vw; /* Takes up 45% of the viewport width */
+  width: 40vw;
   background-image: url(${ryanImage});
-  background-position: left bottom; /* Anchors Ryan to the far left corner */
+  background-position: left bottom;
 `;
 
 const EmmaPortrait = styled(BasePortrait)`
   right: 0;
-  width: 40vw; /* Takes up 45% of the viewport width */
+  width: 40vw;
   background-image: url(${emmaImage});
-  background-position: right bottom; /* Anchors Emma to the far right corner */
+  background-position: right bottom;
 `;
 
 const CentralContent = styled.section`
@@ -99,15 +105,17 @@ const CentralContent = styled.section`
   transform: translate(-50%, -50%);
   text-align: center;
   z-index: 10;
-  width: min(90vw, 720px);
+  width: min(92vw, 720px);
+  padding: 0 1rem;
 `
 
 const MainLogo = styled.h1`
   font-family: 'Kare', 'Playfair Display', Georgia, serif;
-  font-size: clamp(3rem, 10vw, 6rem);
+  font-size: clamp(2.8rem, 11vw, 6rem);
   font-weight: 700;
   line-height: 1;
   margin-top: 0;
+  margin-bottom: 0;
   letter-spacing: -0.01em;
   color: #111;
 `
@@ -116,12 +124,18 @@ const Subtitle = styled.p`
   font-family: 'Lexend Deca', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   margin-top: 0.4rem;
   margin-bottom: 1.6rem;
-  font-size: clamp(1rem, 2.4vw, 1.2rem);
+  font-size: clamp(0.85rem, 2.4vw, 1.2rem);
   font-weight: 600;
   letter-spacing: 0.19em;
   color: #222;
   transform: translate(0.12rem, -3.3rem);
 
+  @media (max-width: 640px) {
+    transform: none;
+    letter-spacing: 0.08em;
+    margin-top: 0.65rem;
+    margin-bottom: 1.25rem;
+  }
 `
 
 const Cta = styled(Link)`

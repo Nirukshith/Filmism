@@ -74,13 +74,26 @@
   }
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
 }
 
 #root {
   width: 100%;
-  max-width: none;
+  max-width: 100vw;
   margin: 0 auto;
   text-align: center;
   border-inline: none;
@@ -88,6 +101,7 @@ body {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 h1,
@@ -105,7 +119,12 @@ h1 {
     font-size: 36px;
     margin: 20px 0;
   }
+  @media (max-width: 640px) {
+    font-size: 28px;
+    margin: 16px 0;
+  }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
@@ -114,7 +133,11 @@ h2 {
   @media (max-width: 1024px) {
     font-size: 20px;
   }
+  @media (max-width: 640px) {
+    font-size: 18px;
+  }
 }
+
 p {
   margin: 0;
 }
@@ -132,5 +155,20 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* Mobile Utilities & Input fixes */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents iOS Safari from auto-zooming */
+  }
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 

@@ -126,6 +126,12 @@ const StatsGrid = styled.div`
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 2rem;
+
+  @media (max-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+    margin-bottom: 1.25rem;
+  }
 `
 
 const StatCard = styled.div`
@@ -137,6 +143,10 @@ const StatCard = styled.div`
   flex-direction: column;
   gap: 0.4rem;
   transition: transform 0.2s, border-color 0.2s;
+
+  @media (max-width: 640px) {
+    padding: 0.85rem 1rem;
+  }
 
   &:hover {
     transform: translateY(-2px);
@@ -157,6 +167,10 @@ const StatValue = styled.span`
   font-size: 1.7rem;
   font-weight: 700;
   color: ${(props) => props.$color || '#fff'};
+
+  @media (max-width: 640px) {
+    font-size: 1.4rem;
+  }
 `
 
 // ─── Controls & Tabs ───────────────────────────────────────────────────────
@@ -166,7 +180,7 @@ const ControlsBar = styled.div`
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-bottom: 1.5rem;
 `
 
@@ -178,6 +192,15 @@ const TabsGroup = styled.div`
   border-radius: 10px;
   border: 1px solid #22222a;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (max-width: 640px) {
+    width: 100%;
+  }
 `
 
 const TabBtn = styled.button`
@@ -262,7 +285,8 @@ const ReportItem = styled.div`
 
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 0.85rem;
+    padding: 1rem;
   }
 `
 

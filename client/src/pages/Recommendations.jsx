@@ -80,7 +80,7 @@ const Topbar = styled.header`
   position: sticky;
   top: 0;
   z-index: 30;
-  @media (max-width: 640px) { padding: 0.65rem 1rem; }
+  @media (max-width: 640px) { padding: 0.65rem 0.85rem; }
 `
 
 const Logo = styled.span`
@@ -91,12 +91,20 @@ const Logo = styled.span`
   letter-spacing: -0.01em;
   user-select: none;
   cursor: default;
+
+  @media (max-width: 480px) {
+    font-size: 1.25rem;
+  }
 `
 
 const TopbarRight = styled.div`
   display: flex;
   align-items: center;
   gap: 0.75rem;
+
+  @media (max-width: 640px) {
+    gap: 0.35rem;
+  }
 `
 
 const DashboardEyebrow = styled.div`
@@ -120,10 +128,15 @@ const TelemetryBadge = styled.div`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.7rem;
   color: #555;
+  white-space: nowrap;
 
   span {
     color: #2e7d32;
     font-weight: 700;
+  }
+
+  @media (max-width: 460px) {
+    display: none;
   }
 `
 
@@ -140,10 +153,18 @@ const TopbarRefreshBtn = styled.button`
   transition: all 0.15s ease;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   white-space: nowrap;
   opacity: ${({ $disabled }) => ($disabled ? 0.65 : 1)};
   pointer-events: ${({ $disabled }) => ($disabled ? 'none' : 'auto')};
+
+  @media (max-width: 640px) {
+    padding: 7px;
+    font-size: 0;
+    min-width: 34px;
+    min-height: 34px;
+  }
 
   &:hover {
     background: #f4f4f6;
@@ -170,8 +191,16 @@ const ContinueBtn = styled.button`
   transition: all 0.15s ease;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   white-space: nowrap;
+
+  @media (max-width: 640px) {
+    padding: 7px;
+    font-size: 0;
+    min-width: 34px;
+    min-height: 34px;
+  }
 
   &:hover {
     background: #e6600c;
@@ -191,7 +220,7 @@ const PageBody = styled.div`
   max-width: 1380px;
   width: 100%;
   margin: 0 auto;
-  @media (max-width: 768px) { padding: 0.85rem 1rem 4.5rem; }
+  @media (max-width: 768px) { padding: 0.75rem 0.75rem 4.5rem; }
 `
 
 const ProfilePanel = styled.div`
@@ -296,7 +325,8 @@ const FilterRow = styled.div`
   @media (max-width: 640px) {
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
+    gap: 4px;
+    width: 100%;
   }
 `
 
@@ -311,6 +341,7 @@ const FilterLabel = styled.div`
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 `
 
 const FilterPillsList = styled.div`
@@ -319,6 +350,18 @@ const FilterPillsList = styled.div`
   gap: 6px;
   flex-wrap: wrap;
   flex: 1;
+
+  @media (max-width: 640px) {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 `
 
 const FilterPill = styled.button`
@@ -420,6 +463,11 @@ const RecCard = styled.div`
   box-shadow: 0 2px 8px rgba(0,0,0,0.03);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
+  @media (max-width: 480px) {
+    padding: 0.75rem 0.8rem;
+    gap: 0.55rem;
+  }
+
   &:hover {
     transform: translateY(-2px);
     border-color: #ff751f;
@@ -431,6 +479,10 @@ const RecCardTop = styled.div`
   display: flex;
   gap: 0.85rem;
   align-items: flex-start;
+
+  @media (max-width: 440px) {
+    gap: 0.65rem;
+  }
 `
 
 const RecPoster = styled.div`
@@ -443,6 +495,11 @@ const RecPoster = styled.div`
       : `linear-gradient(180deg, ${$c1 || '#0d1b2a'}, ${$c2 || '#1e4d7b'})`};
   flex-shrink: 0;
   box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+
+  @media (max-width: 440px) {
+    width: 78px;
+    height: 112px;
+  }
 `
 
 const RecBody = styled.div`
@@ -467,6 +524,10 @@ const RecTitle = styled.h2`
   color: #111;
   margin: 0;
   line-height: 1.2;
+
+  @media (max-width: 480px) {
+    font-size: 0.95rem;
+  }
 `
 
 const MatchPill = styled.span`
@@ -506,6 +567,11 @@ const WhyBox = styled.div`
   color: #333;
   line-height: 1.45;
 
+  @media (max-width: 480px) {
+    font-size: 0.74rem;
+    padding: 0.45rem 0.6rem;
+  }
+
   strong {
     color: #ff751f;
   }
@@ -531,6 +597,12 @@ const RecActions = styled.div`
   flex-wrap: wrap;
   padding-top: 0.5rem;
   border-top: 1px solid #f0f0f0;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
 `
 
 const RecActionsLeft = styled.div`
@@ -538,6 +610,13 @@ const RecActionsLeft = styled.div`
   align-items: center;
   gap: 5px;
   flex-wrap: wrap;
+
+  @media (max-width: 480px) {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
 `
 
 const BookmarkIcon = ({ filled = false, size = 12 }) => (
@@ -586,6 +665,13 @@ const RecWatchlistBtn = styled.button`
   justify-content: center;
   gap: 6px;
   white-space: nowrap;
+  min-height: 36px;
+
+  @media (max-width: 480px) {
+    padding: 6px 6px;
+    font-size: 0.69rem;
+    width: 100%;
+  }
 
   border: 1px solid ${({ $active }) => ($active ? '#18181b' : '#e2e2e5')};
   background: ${({ $active }) => ($active ? '#18181b' : '#f4f4f6')};
@@ -620,6 +706,13 @@ const RecMarkWatchedBtn = styled.button`
   justify-content: center;
   gap: 5px;
   white-space: nowrap;
+  min-height: 36px;
+
+  @media (max-width: 480px) {
+    padding: 6px 6px;
+    font-size: 0.69rem;
+    width: 100%;
+  }
 
   &:hover {
     background: ${({ $active }) => ($active ? '#256629' : '#eaebee')};
@@ -647,6 +740,12 @@ const DismissBtn = styled.button`
   padding: 4px 6px;
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
+
+  @media (max-width: 480px) {
+    text-align: center;
+    padding: 4px;
+    align-self: center;
+  }
 
   &:hover {
     color: #e05353;
@@ -1141,14 +1240,14 @@ function Recommendations() {
               title="Refresh personalized recommendations with newly ranked matches"
             >
               <FilmReelIcon size={13} spinning={isRefreshing} />
-              {isRefreshing ? 'Refreshing Matches...' : 'Refresh Matches'}
+              <span>{isRefreshing ? 'Refreshing Matches...' : 'Refresh Matches'}</span>
             </TopbarRefreshBtn>
             <ContinueBtn
               onClick={() => navigate('/taste?mode=continue')}
               title="Tune and expand your cinema taste profile"
             >
               <FilmStripIcon size={13} />
-              Continue Build Profile
+              <span>Continue Build Profile</span>
             </ContinueBtn>
             <UserAvatar />
           </TopbarRight>

@@ -37,6 +37,14 @@ const ModalBox = styled.div`
   gap: 1.4rem;
   animation: ${slideUp} 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+
+  @media (max-width: 480px) {
+    padding: 1.4rem 1.15rem;
+    border-radius: 16px;
+    gap: 1.1rem;
+  }
 `;
 
 const CloseBtn = styled.button`
