@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
-import ryanImage from '../assets/ryan.png'
-import emmaImage from '../assets/emma.png'
+import ryanImage from '../assets/ryan.webp'
+import emmaImage from '../assets/emma.webp'
 
 const PageWrapper = styled.main`
   width: 100%;
@@ -97,10 +97,14 @@ const RyanPortrait = styled(BasePortrait)`
 `;
 
 const EmmaPortrait = styled(BasePortrait)`
-  right: 0;
+  right: -3vw;
   width: 40vw;
   background-image: url(${emmaImage});
   background-position: right bottom;
+
+  @media (max-width: 1200px) {
+    right: -2vw;
+  }
 `;
 
 const CentralContent = styled.section`
