@@ -6,6 +6,9 @@ import emmaImage from '../assets/emma.png'
 const PageWrapper = styled.main`
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -54,7 +57,9 @@ const HeroSplit = styled.div`
   display: grid;
   grid-template-rows: 1fr 1fr;
   width: 100%;
+  height: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
 `
 
 const TopPanel = styled.div`
@@ -100,68 +105,52 @@ const EmmaPortrait = styled(BasePortrait)`
 
 const CentralContent = styled.section`
   position: absolute;
-  top: 57%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
   z-index: 10;
-  width: min(92vw, 720px);
+  width: min(92vw, 840px);
   padding: 0 1rem;
 `
 
 const MainLogo = styled.h1`
   font-family: 'Kare', 'Playfair Display', Georgia, serif;
-  font-size: clamp(2.8rem, 11vw, 6rem);
+  font-size: clamp(3rem, 11vw, 6.2rem);
   font-weight: 700;
   line-height: 1;
-  margin-top: 0;
-  margin-bottom: 0;
+  margin: 0;
+  padding: 0;
   letter-spacing: -0.01em;
   color: #111;
+  text-transform: uppercase;
 `
 
 const Subtitle = styled.p`
+  position: absolute;
+  top: calc(100% + 0.85rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 90vw;
   font-family: 'Lexend Deca', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  margin-top: 0.4rem;
-  margin-bottom: 1.6rem;
-  font-size: clamp(0.85rem, 2.4vw, 1.2rem);
+  font-size: clamp(0.78rem, 2.2vw, 1.15rem);
   font-weight: 600;
-  letter-spacing: 0.19em;
-  color: #222;
-  transform: translate(0.12rem, -3.3rem);
+  letter-spacing: 0.18em;
+  color: #111;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  white-space: nowrap;
 
   @media (max-width: 640px) {
-    transform: none;
+    font-size: clamp(0.72rem, 3.2vw, 0.92rem);
     letter-spacing: 0.08em;
-    margin-top: 0.65rem;
-    margin-bottom: 1.25rem;
+    top: calc(100% + 0.65rem);
   }
-`
 
-const Cta = styled(Link)`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.85rem 1.6rem;
-  border: 2px solid #111;
-  color: #111;
-  text-decoration: none;
-  font-family: 'Lexend Deca', sans-serif;
-  font-size: 0.92rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: lowercase;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2.2rem);
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: #111;
-    color: #fff;
-    transform: translateY(-2.35rem) scale(1.03);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  @media (max-width: 340px) {
+    white-space: normal;
   }
 `
 
