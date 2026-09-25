@@ -1090,9 +1090,6 @@ export default function CinephileTwin() {
       <Topbar>
         <Logo to="/recommend" as={Link} style={{ textDecoration: 'none' }}>filmism</Logo>
         <TopbarRight>
-          <Link to="/recommend" style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: '#555', textDecoration: 'none', textTransform: 'lowercase' }}>dashboard</Link>
-          <Link to="/messages" style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: '#555', textDecoration: 'none', textTransform: 'lowercase' }}>messages</Link>
-          <Link to="/diary" style={{ fontFamily: 'Lexend Deca, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: '#555', textDecoration: 'none', textTransform: 'lowercase' }}>diary</Link>
           <UserAvatar />
         </TopbarRight>
       </Topbar>

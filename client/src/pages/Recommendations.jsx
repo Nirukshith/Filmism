@@ -160,10 +160,23 @@ const TopbarRefreshBtn = styled.button`
   pointer-events: ${({ $disabled }) => ($disabled ? 'none' : 'auto')};
 
   @media (max-width: 640px) {
-    padding: 7px;
-    font-size: 0;
-    min-width: 34px;
-    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+  }
+
+  @media (max-width: 440px) {
+    padding: 5px 8px;
+    font-size: 0.7rem;
+    span.refresh-text-full {
+      display: none;
+    }
+    span.refresh-text-short {
+      display: inline;
+    }
+  }
+
+  span.refresh-text-short {
+    display: none;
   }
 
   &:hover {
@@ -195,11 +208,8 @@ const ContinueBtn = styled.button`
   gap: 6px;
   white-space: nowrap;
 
-  @media (max-width: 640px) {
-    padding: 7px;
-    font-size: 0;
-    min-width: 34px;
-    min-height: 34px;
+  @media (max-width: 768px) {
+    display: none;
   }
 
   &:hover {
@@ -1240,7 +1250,8 @@ function Recommendations() {
               title="Refresh personalized recommendations with newly ranked matches"
             >
               <FilmReelIcon size={13} spinning={isRefreshing} />
-              <span>{isRefreshing ? 'Refreshing Matches...' : 'Refresh Matches'}</span>
+              <span className="refresh-text-full">{isRefreshing ? 'Refreshing Matches...' : 'Refresh Matches'}</span>
+              <span className="refresh-text-short">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </TopbarRefreshBtn>
             <ContinueBtn
               onClick={() => navigate('/taste?mode=continue')}
