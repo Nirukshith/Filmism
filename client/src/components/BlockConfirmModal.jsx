@@ -29,9 +29,10 @@ const ModalCard = styled.div`
   background: #ffffff;
   width: 100%;
   max-width: 440px;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
   animation: ${scaleUp} 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 `
 
@@ -70,6 +71,10 @@ const ModalBody = styled.div`
   display: flex;
   flex-direction: column;
   gap: 1rem;
+
+  @media (max-width: 480px) {
+    padding: 1.25rem 1rem;
+  }
 `
 
 const WarningText = styled.p`
@@ -96,6 +101,13 @@ const ButtonRow = styled.div`
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 0.5rem;
+
+  @media (max-width: 360px) {
+    flex-direction: column;
+    button {
+      width: 100%;
+    }
+  }
 `
 
 const CancelBtn = styled.button`

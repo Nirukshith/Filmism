@@ -29,6 +29,7 @@ const LeftPanel = styled.div`
   align-items: center;
   padding: 4rem 3rem;
   position: relative;
+  overflow: hidden;
 
   @media (max-width: 768px) {
     display: none;
@@ -51,8 +52,12 @@ const RightPanel = styled.div`
 
   @media (max-width: 768px) {
     min-height: 100vh;
-    padding: 6rem 2rem 3rem;
+    padding: 5.5rem 1.5rem 2.5rem;
     align-items: center;
+  }
+
+  @media (max-width: 480px) {
+    padding: 4.5rem 1.25rem 2rem;
   }
 `
 
@@ -66,9 +71,14 @@ const Nav = styled.nav`
   display: flex;
   gap: 2.5rem;
   z-index: 20;
+  width: max-content;
+  max-width: 95vw;
 
   @media (max-width: 640px) {
-    gap: 1.25rem;
+    top: 1.25rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 `
 
@@ -79,6 +89,11 @@ const NavLink = styled(Link)`
   text-decoration: none;
   text-transform: lowercase;
   transition: opacity 0.2s;
+  padding: 4px;
+
+  @media (max-width: 640px) {
+    font-size: 0.85rem;
+  }
 
   &:hover {
     opacity: 0.7;
@@ -150,7 +165,11 @@ const FeatureItem = styled.li`
 const FormHeader = styled.div`
   width: 100%;
   max-width: 400px;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
+
+  @media (max-width: 480px) {
+    margin-bottom: 1.5rem;
+  }
 `
 
 const BackLink = styled(Link)`
@@ -162,7 +181,7 @@ const BackLink = styled(Link)`
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   transition: opacity 0.2s;
 
   &:hover {
@@ -172,7 +191,7 @@ const BackLink = styled(Link)`
 
 const FormTitle = styled.h2`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  font-size: clamp(1.8rem, 6vw, 3.5rem);
   font-weight: 700;
   color: #111;
   line-height: 1.05;

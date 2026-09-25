@@ -8,6 +8,10 @@ const CardWrapper = styled.div`
   padding: 1.1rem 1.25rem;
   margin-bottom: 1.25rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+
+  @media (max-width: 480px) {
+    padding: 0.9rem 0.85rem;
+  }
 `
 
 const HeaderRow = styled.div`

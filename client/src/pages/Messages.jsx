@@ -63,6 +63,10 @@ const Topbar = styled.header`
   background: #efefef;
   flex-shrink: 0;
   z-index: 30;
+
+  @media (max-width: 640px) {
+    padding: 0.65rem 1rem;
+  }
 `
 
 const Logo = styled(Link)`
@@ -72,12 +76,20 @@ const Logo = styled(Link)`
   color: #111;
   letter-spacing: -0.01em;
   text-decoration: none;
+
+  @media (max-width: 480px) {
+    font-size: 1.25rem;
+  }
 `
 
 const TopbarRight = styled.div`
   display: flex;
   align-items: center;
   gap: 1.25rem;
+
+  @media (max-width: 640px) {
+    gap: 0.5rem;
+  }
 `
 
 const NavLink = styled(Link)`
@@ -88,6 +100,11 @@ const NavLink = styled(Link)`
   text-decoration: none;
   text-transform: lowercase;
   transition: color 0.15s;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+
   &:hover {
     color: #ff751f;
   }
@@ -104,7 +121,7 @@ const ChatLayout = styled.div`
   overflow: hidden;
 
   @media (max-width: 820px) {
-    padding: 0.5rem;
+    padding: 0.35rem;
     gap: 0;
   }
 `
@@ -370,6 +387,11 @@ const ChatHeader = styled.header`
   align-items: center;
   justify-content: space-between;
   background: #fafafa;
+  gap: 0.5rem;
+
+  @media (max-width: 480px) {
+    padding: 0.65rem 0.75rem;
+  }
 `
 
 const PartnerHeader = styled.div`
@@ -420,6 +442,11 @@ const SafetyBtn = styled.button`
   cursor: pointer;
   transition: all 0.15s;
 
+  @media (max-width: 480px) {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.68rem;
+  }
+
   &:hover {
     background: ${({ $variant }) => ($variant === 'danger' ? '#fdf5f5' : '#f5f5f5')};
     border-color: ${({ $variant }) => ($variant === 'danger' ? '#c0392b' : '#bbb')};
@@ -459,6 +486,11 @@ const MessageBubble = styled.div`
   line-height: 1.45;
   word-break: break-word;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  @media (max-width: 600px) {
+    max-width: 85%;
+    padding: 0.55rem 0.85rem;
+  }
 `
 
 const MessageTime = styled.span`
@@ -476,6 +508,11 @@ const ChatInputArea = styled.form`
   align-items: center;
   gap: 0.75rem;
   background: #fff;
+
+  @media (max-width: 480px) {
+    padding: 0.65rem 0.75rem;
+    gap: 0.5rem;
+  }
 `
 
 const Input = styled.input`
@@ -488,6 +525,10 @@ const Input = styled.input`
   background: #fafafa;
   color: #111;
   outline: none;
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+  }
 
   &:focus {
     border-color: #ff751f;
@@ -509,6 +550,10 @@ const SendButton = styled.button`
   align-items: center;
   gap: 0.4rem;
   transition: background 0.15s;
+
+  @media (max-width: 480px) {
+    padding: 0.65rem 0.85rem;
+  }
 
   &:hover:not(:disabled) {
     background: #e6600c;

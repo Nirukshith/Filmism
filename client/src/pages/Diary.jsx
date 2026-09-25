@@ -31,14 +31,16 @@ const Topbar = styled.header`
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.75rem 1.75rem; border-bottom: 1.5px solid #ddd;
   background: #efefef; position: sticky; top: 0; z-index: 30;
+  @media (max-width: 640px) { padding: 0.65rem 1rem; }
 `
 const Logo = styled.span`
   font-family: 'kare', 'Playfair Display', Georgia, serif;
   font-size: 1.5rem; font-weight: 700; color: #111; user-select: none; cursor: default;
+  @media (max-width: 480px) { font-size: 1.25rem; }
 `
 const PageBody = styled.div`
   flex: 1; padding: 1rem 1.75rem 4.5rem; max-width: 1380px; width: 100%; margin: 0 auto;
-  @media (max-width: 768px) { padding: 0.85rem 1rem 4.5rem; }
+  @media (max-width: 768px) { padding: 0.75rem 0.75rem 4.5rem; }
 `
 const PageHeader = styled.div`
   margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1.5px solid #ddd;
@@ -46,7 +48,7 @@ const PageHeader = styled.div`
 `
 const PageTitle = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; color: #111; margin: 0; line-height: 1.1;
+  font-size: clamp(1.4rem, 5vw, 2.2rem); font-weight: 700; color: #111; margin: 0; line-height: 1.1;
 `
 const PageCount = styled.span`
   font-family: 'Lexend Deca', sans-serif; font-size: 0.78rem; color: #888;
@@ -88,8 +90,8 @@ const Grid = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
   gap: 0.85rem;
   @media (max-width: 480px) {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 0.55rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
   }
 `
 const Card = styled.div`
@@ -393,6 +395,18 @@ const FilterTabs = styled.div`
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+
+  @media (max-width: 640px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 `
 
 const FilterBtn = styled.button`
@@ -410,6 +424,8 @@ const FilterBtn = styled.button`
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &:hover {
     border-color: #ff751f;

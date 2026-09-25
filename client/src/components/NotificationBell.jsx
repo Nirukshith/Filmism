@@ -112,9 +112,10 @@ const Badge = styled.span`
 const Dropdown = styled.div`
   position: absolute;
   top: calc(100% + 10px);
-  right: 0;
+  right: -8px;
   width: 320px;
-  max-width: 90vw;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 80px);
   background: #ffffff;
   border: 1.5px solid #e0e0e0;
   border-radius: 12px;

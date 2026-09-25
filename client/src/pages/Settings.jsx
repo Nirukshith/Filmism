@@ -104,6 +104,10 @@ const Topbar = styled.header`
   position: sticky;
   top: 0;
   z-index: 30;
+
+  @media (max-width: 640px) {
+    padding: 0.65rem 1rem;
+  }
 `
 
 const Logo = styled(Link)`
@@ -115,6 +119,11 @@ const Logo = styled(Link)`
   text-decoration: none;
   cursor: pointer;
   transition: opacity 0.15s;
+
+  @media (max-width: 480px) {
+    font-size: 1.25rem;
+  }
+
   &:hover { opacity: 0.85; }
 `
 
@@ -124,7 +133,7 @@ const PageBody = styled.div`
   max-width: 1240px;
   width: 100%;
   margin: 0 auto;
-  @media (max-width: 768px) { padding: 1rem 1rem 4.5rem; }
+  @media (max-width: 768px) { padding: 0.85rem 0.85rem 4.5rem; }
 `
 
 const Breadcrumb = styled.nav`
@@ -217,7 +226,13 @@ const SidebarTabs = styled.div`
   @media (max-width: 860px) {
     flex-direction: row;
     overflow-x: auto;
-    padding: 0.5rem;
+    padding: 0.4rem;
+    gap: 0.35rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 `
 
@@ -238,6 +253,14 @@ const TabButton = styled.button`
   text-align: left;
   transition: all 0.15s ease;
   white-space: nowrap;
+
+  @media (max-width: 860px) {
+    width: auto;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.76rem;
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
 
   span.icon {
     display: inline-flex;
@@ -293,7 +316,8 @@ const HeroBanner = styled.div`
   @media (max-width: 640px) {
     flex-direction: column;
     align-items: flex-start;
-    padding: 1.5rem;
+    padding: 1.25rem;
+    gap: 1rem;
   }
 `
 
@@ -325,6 +349,12 @@ const HeroAvatar = styled.div`
   cursor: pointer;
   user-select: none;
   transition: transform 0.2s ease, border-color 0.2s ease;
+
+  @media (max-width: 480px) {
+    width: 64px;
+    height: 64px;
+    font-size: 1.35rem;
+  }
 
   &:hover {
     border-color: #ff751f;
@@ -408,7 +438,7 @@ const HeroDetails = styled.div`
 
 const HeroName = styled.h2`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+  font-size: clamp(1.2rem, 4.5vw, 1.75rem);
   font-weight: 700;
   color: #fff;
   margin: 0;
@@ -458,6 +488,10 @@ const Card = styled.div`
   border-radius: 12px;
   padding: 1.35rem 1.5rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+
+  @media (max-width: 480px) {
+    padding: 1rem 0.95rem;
+  }
 `
 
 const CardHeader = styled.div`

@@ -29,9 +29,10 @@ const ModalCard = styled.div`
   background: #ffffff;
   width: 100%;
   max-width: 480px;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
   animation: ${scaleUp} 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 `
 
@@ -73,6 +74,11 @@ const ModalBody = styled.form`
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
+
+  @media (max-width: 480px) {
+    padding: 1.25rem 1rem;
+    gap: 1rem;
+  }
 `
 
 const FieldGroup = styled.div`
@@ -97,6 +103,8 @@ const Select = styled.select`
   background: #fafafa;
   color: #111;
   outline: none;
+  width: 100%;
+  box-sizing: border-box;
   &:focus {
     border-color: #ff751f;
     background: #fff;
@@ -114,6 +122,8 @@ const Textarea = styled.textarea`
   min-height: 90px;
   resize: vertical;
   outline: none;
+  width: 100%;
+  box-sizing: border-box;
   &:focus {
     border-color: #ff751f;
     background: #fff;
@@ -137,6 +147,14 @@ const ButtonRow = styled.div`
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 0.5rem;
+
+  @media (max-width: 360px) {
+    flex-direction: column;
+    button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
 `
 
 const CancelBtn = styled.button`

@@ -28,6 +28,10 @@ const Topbar = styled.header`
   position: sticky;
   top: 0;
   z-index: 30;
+
+  @media (max-width: 640px) {
+    padding: 0.65rem 1rem;
+  }
 `
 
 const Logo = styled.span`
@@ -38,6 +42,10 @@ const Logo = styled.span`
   letter-spacing: -0.01em;
   user-select: none;
   cursor: default;
+
+  @media (max-width: 480px) {
+    font-size: 1.25rem;
+  }
 `
 
 const TopbarRight = styled.div`
@@ -52,7 +60,7 @@ const PageBody = styled.div`
   max-width: 1380px;
   width: 100%;
   margin: 0 auto;
-  @media (max-width: 768px) { padding: 0.85rem 1rem 4.5rem; }
+  @media (max-width: 768px) { padding: 0.75rem 0.75rem 4.5rem; }
 `
 
 const PageHeader = styled.div`
@@ -68,7 +76,7 @@ const PageHeader = styled.div`
 
 const PageTitle = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-size: clamp(1.4rem, 5vw, 2.2rem);
   font-weight: 700;
   color: #111;
   margin: 0;
@@ -133,9 +141,12 @@ const Grid = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 1.1rem;
 
-  @media (max-width: 480px) {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 0.75rem;
+  @media (max-width: 600px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+  }
+  @media (max-width: 350px) {
+    grid-template-columns: 1fr;
   }
 `
 
