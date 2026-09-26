@@ -105,11 +105,7 @@ const StepItem = styled.div`
   display: flex;
   align-items: center;
   gap: 6px;
-  cursor: ${({ $clickable }) => ($clickable ? 'pointer' : 'default')};
-  transition: opacity 0.2s;
-  &:hover {
-    opacity: ${({ $clickable }) => ($clickable ? '0.8' : '1')};
-  }
+  cursor: default;
 `
 
 const StepDot = styled.div`
@@ -155,12 +151,12 @@ const PageBody = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: ${({ $step }) => ($step === 4 ? 'flex-start' : 'center')};
-  padding: ${({ $step }) => ($step === 4 ? '1.5rem 1.75rem 6.5rem' : '1rem 1.75rem 4.5rem')};
+  justify-content: flex-start;
+  padding: 1.5rem 1.75rem 6rem;
   max-width: 1380px;
   width: 100%;
   margin: 0 auto;
-  @media (max-width: 768px) { padding: ${({ $step }) => ($step === 4 ? '1rem 1rem 6.5rem' : '0.85rem 1rem 4.5rem')}; }
+  @media (max-width: 768px) { padding: 1rem 1rem 5rem; }
 `
 
 const StepContentWrapper = styled.div`
@@ -170,15 +166,16 @@ const StepContentWrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding-top: 0.5rem;
 `
 
 const SectionTitle = styled.h1`
   font-family: 'Lemon Milk', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.75rem, 3.5vw, 2.35rem);
+  font-size: clamp(1.5rem, 3vw, 2rem);
   font-weight: 700;
   color: #111;
   line-height: 1.15;
-  margin: 0 auto 0.35rem;
+  margin: 0 auto 0.25rem;
   text-align: center;
   max-width: 680px;
 `
@@ -187,7 +184,7 @@ const SectionSub = styled.p`
   font-family: 'Lexend Deca', sans-serif;
   font-size: 0.88rem;
   color: #666;
-  margin: 0 auto 1.1rem;
+  margin: 0 auto 0.85rem;
   line-height: 1.5;
   max-width: 540px;
   text-align: center;
@@ -901,6 +898,11 @@ const DEFAULT_GENRE_MAP = {
 function TasteProfile() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const authStatus = getAuthStatus()
+  const isContinueMode =
+    searchParams.get('mode') === 'continue' ||
+    searchParams.has('recalibrate') ||
+    Boolean(authStatus?.tasteProfileComplete)
   const {
     selectedGenres,
     setSelectedGenres,
@@ -917,6 +919,8 @@ function TasteProfile() {
     aiSynthesis,
     userTasteProfile,
     clearProfile,
+    sessionId,
+    fetchUserProfile,
   } = useTasteProfile()
 
   const [step, setStep] = useState(1)
@@ -991,7 +995,7 @@ function TasteProfile() {
     }
   }, [filmCache])
 
-  // Seed filmCache from user's saved taste profile favorites
+  // Seed filmCache, selectedFilms, and favoriteRatings from user's saved taste profile favorites
   useEffect(() => {
     if (userTasteProfile?.favorites?.length > 0) {
       setFilmCache((prev) => {
@@ -1010,6 +1014,17 @@ function TasteProfile() {
         })
         return next
       })
+
+      const ids = userTasteProfile.favorites.map((f) => Number(f.tmdbId || f.id)).filter(Boolean)
+      const ratings = {}
+      userTasteProfile.favorites.forEach((f) => {
+        const id = Number(f.tmdbId || f.id)
+        if (id) {
+          ratings[id] = f.rating !== undefined ? f.rating : 3
+        }
+      })
+      setSelectedFilms((prev) => Array.from(new Set([...prev, ...ids])))
+      setFavoriteRatings((prev) => ({ ...ratings, ...prev }))
     }
   }, [userTasteProfile])
 
@@ -1037,11 +1052,21 @@ function TasteProfile() {
     }
   }, [selectedFilms])
 
+  // Load user profile on mount
+  useEffect(() => {
+    if (typeof fetchUserProfile === 'function') {
+      fetchUserProfile()
+    }
+  }, [])
+
   // Handle continue entry point from query parameters
   useEffect(() => {
     const mode = searchParams.get('mode')
     if (mode === 'continue') {
       setStep(3)
+      if (typeof fetchUserProfile === 'function') {
+        fetchUserProfile()
+      }
     } else if (mode === 'new_guest') {
       clearProfile()
       setFilmCache({})
@@ -1093,7 +1118,7 @@ function TasteProfile() {
       setIsSearching(true)
       try {
         const response = await api.get('/movies/search', {
-          params: { query: search.trim() },
+          params: { query: search.trim(), sessionId },
         })
 
         const codeToId = {}
@@ -1125,7 +1150,22 @@ function TasteProfile() {
           poster_path: film.poster_path,
           c1: '#0d1b2a',
           c2: '#1e4d7b',
+          isFavorite: film.isFavorite,
+          userRating: film.userRating,
         }))
+
+        // Pre-populate UI state if searched films are in user favorites/ratings
+        transformed.forEach((f) => {
+          if (f.isFavorite || (f.userRating !== null && f.userRating !== undefined)) {
+            setSelectedFilms((prev) => (prev.includes(f.id) ? prev : [...prev, f.id]))
+            if (f.userRating !== null && f.userRating !== undefined) {
+              setFavoriteRatings((prev) => ({
+                ...prev,
+                [f.id]: prev[f.id] !== undefined ? prev[f.id] : f.userRating,
+              }))
+            }
+          }
+        })
 
         setSearchResults(transformed)
         setFilmCache(prev => {
@@ -1142,7 +1182,7 @@ function TasteProfile() {
     }, 350)
 
     return () => clearTimeout(timer)
-  }, [search, genreMap, originsMap])
+  }, [search, genreMap, originsMap, sessionId])
 
   // Fetch movies when genres, cinemas, or page changes
   useEffect(() => {
@@ -1177,10 +1217,11 @@ function TasteProfile() {
             with_origin_country: countryCodes || undefined,
             decade: selectedDecade !== 'all' ? selectedDecade : undefined,
             page: currentPage,
+            sessionId,
           },
         })
 
-        const { results, total_pages } = response.data
+        const { results, total_pages, userFavorites } = response.data
         setTotalPages(total_pages || 1)
 
         const codeToId = {}
@@ -1212,7 +1253,33 @@ function TasteProfile() {
           poster_path: film.poster_path,
           c1: '#0d1b2a',
           c2: '#1e4d7b',
+          isFavorite: film.isFavorite,
+          userRating: film.userRating,
         }))
+
+        // Pre-populate UI state from user ratings and favorites returned by endpoint
+        if (Array.isArray(userFavorites) && userFavorites.length > 0) {
+          const favIds = userFavorites.map((f) => Number(f.tmdbId)).filter(Boolean)
+          const favRatings = {}
+          userFavorites.forEach((f) => {
+            if (f.tmdbId) favRatings[f.tmdbId] = f.rating !== undefined ? f.rating : 3
+          })
+          setSelectedFilms((prev) => Array.from(new Set([...prev, ...favIds])))
+          setFavoriteRatings((prev) => ({ ...favRatings, ...prev }))
+        }
+
+        // Also cross-reference any discovered films with user rating / favorite
+        transformedFilms.forEach((f) => {
+          if (f.isFavorite || (f.userRating !== null && f.userRating !== undefined)) {
+            setSelectedFilms((prev) => (prev.includes(f.id) ? prev : [...prev, f.id]))
+            if (f.userRating !== null && f.userRating !== undefined) {
+              setFavoriteRatings((prev) => ({
+                ...prev,
+                [f.id]: prev[f.id] !== undefined ? prev[f.id] : f.userRating,
+              }))
+            }
+          }
+        })
 
         setFilteredFilms(transformedFilms)
         setFilmCache(prev => {
@@ -1231,24 +1298,27 @@ function TasteProfile() {
     if (selectedGenres.length > 0 || selectedCinemas.length > 0) {
       fetchMovies()
     }
-  }, [selectedGenres, selectedCinemas, genreMap, originsMap, currentPage, selectedDecade])
+  }, [selectedGenres, selectedCinemas, genreMap, originsMap, currentPage, selectedDecade, sessionId])
 
   useEffect(() => {
     setCurrentPage(1)
   }, [selectedGenres, selectedCinemas, selectedDecade])
 
   const toggleGenre = (g) => {
-    // If genres are changed: already selected origins and favourite films will be reset
-    setSelectedCinemas([])
-    setSelectedFilms([])
-    setFavoriteRatings({})
+    // In continue mode, keep existing favorites intact; in fresh onboarding, reset downstream selections
+    if (!isContinueMode) {
+      setSelectedCinemas([])
+      setSelectedFilms([])
+      setFavoriteRatings({})
+    }
     setSelectedGenres((p) => p.includes(g) ? p.filter(x => x !== g) : [...p, g])
   }
 
   const toggleCinema = (id) => {
-    // If origins are changed: genres not changed, already selected favourite films will be reset
-    setSelectedFilms([])
-    setFavoriteRatings({})
+    if (!isContinueMode) {
+      setSelectedFilms([])
+      setFavoriteRatings({})
+    }
     setSelectedCinemas((p) => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
   }
 
@@ -1263,7 +1333,11 @@ function TasteProfile() {
         return prev.filter(x => x !== id)
       } else {
         if (!favoriteRatings[id]) {
-          setFilmRating(id, 3) // Default to 'good' (3)
+          const initialRating =
+            typeof filmOrId === 'object' && filmOrId.userRating !== null && filmOrId.userRating !== undefined
+              ? filmOrId.userRating
+              : 3
+          setFilmRating(id, initialRating)
         }
         return [...prev, id]
       }
@@ -1271,8 +1345,6 @@ function TasteProfile() {
   }
 
   const selectedFilmObjs = selectedFilms.map(id => filmCache[id] || { id, title: `Film #${id}`, genres: [] })
-
-  const isContinueMode = searchParams.get('mode') === 'continue'
   const canStep2 = selectedGenres.length > 0
   const canStep3 = selectedCinemas.length > 0
   const canFinish = selectedFilms.length >= MIN_FILMS || (isContinueMode && selectedFilms.length > 0)
@@ -1389,28 +1461,21 @@ function TasteProfile() {
             <span>step {step}/4</span> · {STEPS[step - 1]?.label}
           </MobileStepBadge>
           <StepIndicator>
-            {STEPS.map((s, i) => {
-              const clickable = isStepClickable(s.num)
-              return (
-                <StepItem
-                  key={s.num}
-                  $clickable={clickable}
-                  onClick={() => clickable && handleStepClick(s.num)}
-                >
-                  {i > 0 && <StepLine $done={step > s.num} />}
-                  <StepDot $active={step === s.num} $done={step > s.num}>
-                    {step > s.num ? '✓' : s.num}
-                  </StepDot>
-                  <StepLabel $active={step === s.num} $done={step > s.num}>
-                    {s.label}
-                  </StepLabel>
-                </StepItem>
-              )
-            })}
+            {STEPS.map((s, i) => (
+              <StepItem key={s.num}>
+                {i > 0 && <StepLine $done={step > s.num} />}
+                <StepDot $active={step === s.num} $done={step > s.num}>
+                  {step > s.num ? '✓' : s.num}
+                </StepDot>
+                <StepLabel $active={step === s.num} $done={step > s.num}>
+                  {s.label}
+                </StepLabel>
+              </StepItem>
+            ))}
           </StepIndicator>
         </Topbar>
 
-        <PageBody $step={step}>
+        <PageBody>
 
           {/* ══ STEP 1: Genres ══ */}
           {step === 1 && (
@@ -1634,7 +1699,10 @@ function TasteProfile() {
 
                   return displayFilms.map((f) => {
                     const isSelected = selectedFilms.includes(f.id)
-                    const ratingVal = favoriteRatings[f.id] !== undefined ? favoriteRatings[f.id] : 3
+                    const ratingVal =
+                      favoriteRatings[f.id] !== undefined
+                        ? favoriteRatings[f.id]
+                        : (f.userRating !== null && f.userRating !== undefined ? f.userRating : 3)
 
                     return (
                       <FilmCard
@@ -1776,10 +1844,14 @@ function TasteProfile() {
           )}
         </BottomHint>
         <BtnRow>
-          {step > 1 ? (
-            <BackBtn onClick={() => setStep(step - 1)}>← back</BackBtn>
+          {isContinueMode ? (
+            <BackBtn onClick={() => navigate('/recommend')}>return to dashboard</BackBtn>
           ) : (
-            <BackBtn onClick={() => navigate('/')}>← back</BackBtn>
+            step > 1 ? (
+              <BackBtn onClick={() => setStep(step - 1)}>← back</BackBtn>
+            ) : (
+              <BackBtn onClick={() => navigate('/')}>← back</BackBtn>
+            )
           )}
           <NextBtn
             disabled={

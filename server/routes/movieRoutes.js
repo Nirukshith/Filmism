@@ -3,7 +3,9 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const tmdb = require('../services/tmdbService');
 const { CINEMA_NAME_TO_COUNTRY_CODE } = require('../utils/originMap');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, optionalProtect } = require('../middleware/authMiddleware');
+const UserTasteProfile = require('../models/userTasteProfileModel');
+const RecommendationLog = require('../models/recommendationLogModel');
 const {
   getMovieProfile,
   profileMovie,
@@ -72,8 +74,59 @@ router.get('/genres', async (req, res) => {
   }
 });
 
+/**
+ * Helper to fetch a user or guest's saved favorite and rated movies from MongoDB.
+ * Returns a Map of tmdbId -> { tmdbId, rating, ratingLabel, isFavorite }
+ */
+const getUserMovieDataMap = async (userId, sessionId) => {
+  const userMap = new Map();
+  if (!userId && !sessionId) return userMap;
+  const query = userId ? { userId } : { sessionId };
+
+  try {
+    // 1. Fetch saved favorites from UserTasteProfile
+    const profile = await UserTasteProfile.findOne(query).select('favorites').lean();
+    if (profile?.favorites?.length > 0) {
+      profile.favorites.forEach((fav) => {
+        const id = Number(fav.tmdbId || fav.id);
+        if (id) {
+          userMap.set(id, {
+            tmdbId: id,
+            rating: fav.rating !== undefined ? fav.rating : 3,
+            ratingLabel: fav.ratingLabel || 'good',
+            isFavorite: true,
+          });
+        }
+      });
+    }
+
+    // 2. Cross-reference RecommendationLog for watched/rated movies
+    const logs = await RecommendationLog.find({ ...query, action: 'watched' })
+      .select('tmdbId outcomeRating outcomeLabel')
+      .lean();
+    logs.forEach((log) => {
+      const id = Number(log.tmdbId);
+      if (id) {
+        const existing = userMap.get(id);
+        userMap.set(id, {
+          tmdbId: id,
+          rating: (log.outcomeRating !== undefined && log.outcomeRating > 0)
+            ? log.outcomeRating
+            : (existing?.rating !== undefined ? existing.rating : 3),
+          ratingLabel: log.outcomeLabel || existing?.ratingLabel || 'good',
+          isFavorite: existing ? existing.isFavorite : false,
+        });
+      }
+    });
+  } catch (err) {
+    console.warn('Error fetching user movie data for discover/search:', err.message);
+  }
+
+  return userMap;
+};
+
 // Discover movies by genre/origin/decade — cached in memory for 2 hours
-router.get('/discover', tmdbProxyLimiter, async (req, res) => {
+router.get('/discover', tmdbProxyLimiter, optionalProtect, async (req, res) => {
   try {
     let { with_genres, with_origin_country, release_date_gte, release_date_lte, decade } = req.query;
     const page = parseInt(req.query.page) || 1;
@@ -127,11 +180,27 @@ router.get('/discover', tmdbProxyLimiter, async (req, res) => {
       return response.data;
     });
 
+    // Join and merge user-specific rating/favorite data
+    const userId = req.user?._id || req.user?.id;
+    const sessionId = req.query.sessionId;
+    const userMap = await getUserMovieDataMap(userId, sessionId);
+
+    const enrichedResults = (data.results || []).map((film) => {
+      const userData = userMap.get(film.id);
+      return {
+        ...film,
+        isFavorite: userData ? userData.isFavorite : false,
+        userRating: userData && userData.rating !== undefined ? userData.rating : null,
+        userRatingLabel: userData?.ratingLabel || null,
+      };
+    });
+
     res.json({
-      results:     data.results,
+      results:     enrichedResults,
       page:        data.page,
       total_pages: Math.min(data.total_pages, 50), // TMDB caps at 500 pages; we cap at 50
       total_results: data.total_results,
+      userFavorites: Array.from(userMap.values()),
     });
   } catch (err) {
     const statusCode = err.isTimeout ? 504 : (err.response?.status && err.response.status < 500 ? err.response.status : 503);
@@ -147,7 +216,7 @@ router.get('/discover', tmdbProxyLimiter, async (req, res) => {
 });
 
 // Search movies — cached in memory for 30 minutes
-router.get('/search', tmdbProxyLimiter, async (req, res) => {
+router.get('/search', tmdbProxyLimiter, optionalProtect, async (req, res) => {
   try {
     const { query } = req.query;
     if (!query || !query.trim()) {
@@ -160,7 +229,22 @@ router.get('/search', tmdbProxyLimiter, async (req, res) => {
       return data.results || [];
     });
 
-    res.json(results);
+    // Join and merge user-specific rating/favorite data
+    const userId = req.user?._id || req.user?.id;
+    const sessionId = req.query.sessionId;
+    const userMap = await getUserMovieDataMap(userId, sessionId);
+
+    const enrichedResults = (results || []).map((film) => {
+      const userData = userMap.get(film.id);
+      return {
+        ...film,
+        isFavorite: userData ? userData.isFavorite : false,
+        userRating: userData && userData.rating !== undefined ? userData.rating : null,
+        userRatingLabel: userData?.ratingLabel || null,
+      };
+    });
+
+    res.json(enrichedResults);
   } catch (err) {
     const statusCode = err.isTimeout ? 504 : (err.response?.status && err.response.status < 500 ? err.response.status : 503);
     res.status(statusCode).json({
