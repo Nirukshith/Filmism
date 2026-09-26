@@ -377,8 +377,8 @@ function RegisterPage() {
   const validate = () => {
     const newErrors = {}
     if (!form.firstName.trim()) newErrors.firstName = 'required'
-    if (!form.lastName.trim())  newErrors.lastName  = 'required'
-    if (!form.email.trim())     newErrors.email     = 'required'
+    if (!form.lastName.trim()) newErrors.lastName = 'required'
+    if (!form.email.trim()) newErrors.email = 'required'
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'invalid email'
     if (!form.password) {
       newErrors.password = 'required'
@@ -412,28 +412,34 @@ function RegisterPage() {
         email: form.email,
         password: form.password,
       })
-      
+
       // Store token and user data
       if (response.data.token) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data))
       }
-      
+
       setStep('otp') // go to taste profile flow after register
     } catch (err) {
+      const status = err.response?.status
       const message = err.response?.data?.message || 'Something went wrong. Please try again.'
-      setErrors({ general: message })
+      if (status === 409) {
+        // Email already registered — show error inline on the email field
+        setErrors({ email: message })
+      } else {
+        setErrors({ general: message })
+      }
     } finally {
       setLoading(false)
     }
   }
 
   const handleVerifyOtp = async (e) => {
-  e.preventDefault()
-  if (!otp.trim() || otp.length !== 6) {
-    setOtpError('enter the 6-digit code')
-    return
-  }
+    e.preventDefault()
+    if (!otp.trim() || otp.length !== 6) {
+      setOtpError('enter the 6-digit code')
+      return
+    }
 
     e.preventDefault()
     if (!otp.trim() || otp.length !== 6) {
@@ -491,13 +497,13 @@ function RegisterPage() {
         <RightContent>
           <RightTitle>Films that<br />feel like you.</RightTitle>
           <RightBody>
-            Not an algorithm. A taste profile built from the posters that pull you in.
+            Not an algorithm. A taste profile built from the films that pull you in.
           </RightBody>
           <FeatureList>
-            <FeatureItem>Browse posters from world cinema</FeatureItem>
+            <FeatureItem>Browse films from world cinema</FeatureItem>
             <FeatureItem>Build your aesthetic taste profile</FeatureItem>
             <FeatureItem>Get matched to films you'll love</FeatureItem>
-            <FeatureItem>Rate, save, and track what you watch</FeatureItem>
+            <FeatureItem>Find your cinephile twin and explore</FeatureItem>
           </FeatureList>
         </RightContent>
       </RightPanel>
@@ -508,150 +514,150 @@ function RegisterPage() {
           <FormTitle>Create your<br />account.</FormTitle>
         </FormHeader>
         {step === 'register' ? (
-        <Form onSubmit={handleSubmit} noValidate>
+          <Form onSubmit={handleSubmit} noValidate>
 
-          <FieldRow>
+            <FieldRow>
+              <Field>
+                <Label htmlFor="firstName">first name</Label>
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  placeholder="Ryan"
+                  value={form.firstName}
+                  onChange={handleChange}
+                />
+                {errors.firstName && <ErrorText>{errors.firstName}</ErrorText>}
+              </Field>
+
+              <Field>
+                <Label htmlFor="lastName">last name</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  placeholder="Gosling"
+                  value={form.lastName}
+                  onChange={handleChange}
+                />
+                {errors.lastName && <ErrorText>{errors.lastName}</ErrorText>}
+              </Field>
+            </FieldRow>
+
             <Field>
-              <Label htmlFor="firstName">first name</Label>
+              <Label htmlFor="email">email</Label>
               <Input
-                id="firstName"
-                name="firstName"
-                type="text"
-                placeholder="Ryan"
-                value={form.firstName}
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                value={form.email}
                 onChange={handleChange}
               />
-              {errors.firstName && <ErrorText>{errors.firstName}</ErrorText>}
+              {errors.email && <ErrorText>{errors.email}</ErrorText>}
             </Field>
 
             <Field>
-              <Label htmlFor="lastName">last name</Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                type="text"
-                placeholder="Gosling"
-                value={form.lastName}
-                onChange={handleChange}
-              />
-              {errors.lastName && <ErrorText>{errors.lastName}</ErrorText>}
+              <Label htmlFor="password">password</Label>
+              <PasswordInputWrap>
+                <PasswordInput
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="min. 8 chars, 1 uppercase, 1 special char"
+                  value={form.password}
+                  onChange={handleChange}
+                />
+                <ShowPasswordBtn
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </ShowPasswordBtn>
+              </PasswordInputWrap>
+              {errors.password && <ErrorText>{errors.password}</ErrorText>}
             </Field>
-          </FieldRow>
 
-          <Field>
-            <Label htmlFor="email">email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={handleChange}
-            />
-            {errors.email && <ErrorText>{errors.email}</ErrorText>}
-          </Field>
+            <Field>
+              <Label htmlFor="confirmPassword">confirm password</Label>
+              <PasswordInputWrap>
+                <PasswordInput
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="repeat your password"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                />
+                <ShowPasswordBtn
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </ShowPasswordBtn>
+              </PasswordInputWrap>
+              {errors.confirmPassword && <ErrorText>{errors.confirmPassword}</ErrorText>}
+            </Field>
 
-          <Field>
-            <Label htmlFor="password">password</Label>
-            <PasswordInputWrap>
-              <PasswordInput
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="min. 8 chars, 1 uppercase, 1 special char"
-                value={form.password}
-                onChange={handleChange}
+            {errors.general && <ErrorText>{errors.general}</ErrorText>}
+
+            <SubmitBtn type="submit" disabled={loading}>
+              {loading ? 'creating account...' : 'create account →'}
+            </SubmitBtn>
+
+            <Divider><span>or</span></Divider>
+
+            <LoginPrompt>
+              already have an account? <Link to={`/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}>log in</Link>
+            </LoginPrompt>
+
+          </Form>
+        ) : (
+          <Form onSubmit={handleVerifyOtp} noValidate>
+
+            <FormSubtitle style={{ marginBottom: '0.5rem' }}>
+              we sent a 6-digit code to <strong>{form.email}</strong>
+            </FormSubtitle>
+
+            <Field>
+              <Label htmlFor="otp">verification code</Label>
+              <Input
+                id="otp"
+                name="otp"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                value={otp}
+                onChange={(e) => {
+                  setOtp(e.target.value.replace(/\D/g, ''))
+                  if (otpError) setOtpError('')
+                }}
+                style={{ letterSpacing: '0.5em', fontSize: '1.3rem', textAlign: 'center' }}
               />
-              <ShowPasswordBtn
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-              </ShowPasswordBtn>
-            </PasswordInputWrap>
-            {errors.password && <ErrorText>{errors.password}</ErrorText>}
-          </Field>
+              {otpError && <ErrorText>{otpError}</ErrorText>}
+            </Field>
 
-          <Field>
-            <Label htmlFor="confirmPassword">confirm password</Label>
-            <PasswordInputWrap>
-              <PasswordInput
-                id="confirmPassword"
-                name="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
-                placeholder="repeat your password"
-                value={form.confirmPassword}
-                onChange={handleChange}
-              />
-              <ShowPasswordBtn
-                type="button"
-                onClick={() => setShowConfirmPassword((prev) => !prev)}
-                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-              >
-                {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
-              </ShowPasswordBtn>
-            </PasswordInputWrap>
-            {errors.confirmPassword && <ErrorText>{errors.confirmPassword}</ErrorText>}
-          </Field>
+            <SubmitBtn type="submit" disabled={loading}>
+              {loading ? 'verifying...' : 'verify →'}
+            </SubmitBtn>
 
-          {errors.general && <ErrorText>{errors.general}</ErrorText>}
+            <LoginPrompt>
+              didn't get a code?{' '}
+              {resendCooldown > 0 ? (
+                <span>resend in {resendCooldown}s</span>
+              ) : (
+                <a href="#" onClick={(e) => { e.preventDefault(); handleResendOtp() }}>
+                  resend code
+                </a>
+              )}
+            </LoginPrompt>
 
-          <SubmitBtn type="submit" disabled={loading}>
-            {loading ? 'creating account...' : 'create account →'}
-          </SubmitBtn>
+          </Form>
+        )}
 
-          <Divider><span>or</span></Divider>
-
-          <LoginPrompt>
-            already have an account? <Link to={`/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}>log in</Link>
-          </LoginPrompt>
-
-        </Form>
-      ) : (
-        <Form onSubmit={handleVerifyOtp} noValidate>
-
-          <FormSubtitle style={{ marginBottom: '0.5rem' }}>
-            we sent a 6-digit code to <strong>{form.email}</strong>
-          </FormSubtitle>
-
-          <Field>
-            <Label htmlFor="otp">verification code</Label>
-            <Input
-              id="otp"
-              name="otp"
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="000000"
-              value={otp}
-              onChange={(e) => {
-                setOtp(e.target.value.replace(/\D/g, ''))
-                if (otpError) setOtpError('')
-              }}
-              style={{ letterSpacing: '0.5em', fontSize: '1.3rem', textAlign: 'center' }}
-            />
-            {otpError && <ErrorText>{otpError}</ErrorText>}
-          </Field>
-
-          <SubmitBtn type="submit" disabled={loading}>
-            {loading ? 'verifying...' : 'verify →'}
-          </SubmitBtn>
-
-          <LoginPrompt>
-            didn't get a code?{' '}
-            {resendCooldown > 0 ? (
-              <span>resend in {resendCooldown}s</span>
-            ) : (
-              <a href="#" onClick={(e) => { e.preventDefault(); handleResendOtp() }}>
-                resend code
-              </a>
-            )}
-          </LoginPrompt>
-
-        </Form>
-      )}
-      
       </LeftPanel>
 
     </PageWrapper>

@@ -773,16 +773,30 @@ async function appendFavoritesToTasteProfile({
 
   const existingIds = new Set((profile.favorites || []).map((f) => Number(f.tmdbId)));
   const normalizedNew = [];
+  const labels = { 1: 'not for me', 2: 'okay', 3: 'good', 4: 'great', 0: 'haven\'t watched' };
+  let ratingsUpdated = false;
 
   newFavorites.forEach((f) => {
     const item = normalizeFavoriteItem(f);
-    if (item && !existingIds.has(item.tmdbId)) {
+    if (!item) return;
+    const existing = (profile.favorites || []).find((fav) => Number(fav.tmdbId) === item.tmdbId);
+    if (existing) {
+      if (item.rating !== undefined && existing.rating !== item.rating) {
+        existing.rating = item.rating;
+        existing.ratingLabel = labels[item.rating] || 'good';
+        ratingsUpdated = true;
+      }
+    } else if (!existingIds.has(item.tmdbId)) {
       normalizedNew.push(item);
       existingIds.add(item.tmdbId);
     }
   });
 
   if (normalizedNew.length === 0) {
+    if (ratingsUpdated) {
+      profile.markModified('favorites');
+      await profile.save();
+    }
     return {
       success: true,
       tasteProfile: profile,

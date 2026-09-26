@@ -61,23 +61,27 @@ const registerUser = async (req, res, next) => {
     // Check if user already exists
     const userExists = await User.findOne({ email: normalizedEmail })
     if (userExists) {
-      if (!userExists.isVerified) {
-        // Refresh OTP for unverified user and send email
-        const otp = Math.floor(100000 + Math.random() * 900000).toString()
-        userExists.firstName = firstName.trim()
-        userExists.lastName = lastName.trim()
-        userExists.password = password // pre-save will rehash
-        userExists.otp = await bcrypt.hash(otp, 10)
-        userExists.otpExpiry = Date.now() + 5 * 60 * 1000
-        userExists.otpAttempts = 0
-        userExists.otpLastSentAt = Date.now()
-        await userExists.save()
-        await sendOtpEmail(userExists.email, otp)
+      if (userExists.isVerified) {
+        // Fully registered — return clear error so the frontend can display it
+        return res.status(409).json({
+          message: 'An account with this email already exists. Please log in instead.',
+        })
       }
 
-      // Return uniform message to prevent account enumeration
+      // Unverified user — refresh OTP and let them complete registration
+      const otp = Math.floor(100000 + Math.random() * 900000).toString()
+      userExists.firstName = firstName.trim()
+      userExists.lastName = lastName.trim()
+      userExists.password = password // pre-save will rehash
+      userExists.otp = await bcrypt.hash(otp, 10)
+      userExists.otpExpiry = Date.now() + 5 * 60 * 1000
+      userExists.otpAttempts = 0
+      userExists.otpLastSentAt = Date.now()
+      await userExists.save()
+      await sendOtpEmail(userExists.email, otp)
+
       return res.status(200).json({
-        message: 'If this email is not yet registered, a verification code has been sent to your email.',
+        message: 'A new verification code has been sent to your email.',
         email: normalizedEmail,
         tasteProfileComplete: false,
       })

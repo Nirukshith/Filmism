@@ -184,11 +184,70 @@ export function TasteProvider({ children }) {
     }
   }
 
+  // Synchronize and load live taste profile data from backend (/api/taste-profile/me)
+  const fetchUserProfile = async (overrideSessionId) => {
+    const sId = overrideSessionId || sessionId
+    const token = localStorage.getItem('token')
+    if (!token && !sId) return null
+
+    try {
+      const response = await api.get('/taste-profile/me', {
+        params: { sessionId: sId },
+      })
+
+      if (response.data?.success && response.data?.tasteProfile) {
+        const profile = response.data.tasteProfile
+        setUserTasteProfile(profile)
+
+        if (Array.isArray(profile.tasteClusters) && profile.tasteClusters.length > 0) {
+          setTasteClusters(profile.tasteClusters)
+          localStorage.setItem('filmism_taste_clusters', JSON.stringify(profile.tasteClusters))
+        }
+
+        if (profile.aiSynthesis) {
+          setAiSynthesis(profile.aiSynthesis)
+          localStorage.setItem('filmism_ai_synthesis', profile.aiSynthesis)
+        }
+
+        if (Array.isArray(profile.selectedGenres) && profile.selectedGenres.length > 0) {
+          setSelectedGenres(profile.selectedGenres)
+        }
+
+        if (Array.isArray(profile.selectedOrigins) && profile.selectedOrigins.length > 0) {
+          setSelectedCinemas(profile.selectedOrigins)
+        }
+
+        if (Array.isArray(profile.favorites) && profile.favorites.length > 0) {
+          const ids = profile.favorites.map((f) => Number(f.tmdbId || f.id)).filter(Boolean)
+          const ratingsMap = {}
+          profile.favorites.forEach((f) => {
+            const id = Number(f.tmdbId || f.id)
+            if (id) {
+              ratingsMap[id] = f.rating !== undefined ? f.rating : 3
+            }
+          })
+
+          setSelectedFilms((prev) => Array.from(new Set([...prev, ...ids])))
+          setFavoriteRatings((prev) => ({ ...ratingsMap, ...prev }))
+        }
+
+        return profile
+      }
+    } catch (err) {
+      if (err.response?.status !== 404) {
+        console.warn('Failed to fetch user taste profile:', err.message)
+      }
+      return null
+    }
+  }
+
   useEffect(() => {
     reloadFromStorage()
+    fetchUserProfile()
 
     const handleAuthChange = () => {
       reloadFromStorage()
+      fetchUserProfile()
     }
 
     window.addEventListener('storage', handleAuthChange)
@@ -306,8 +365,16 @@ export function TasteProvider({ children }) {
         setTasteClusters(clusters || [])
         if (synthesis) setAiSynthesis(synthesis)
 
-        setSelectedFilms((prev) => Array.from(new Set([...prev, ...(films || [])])))
-        setFavoriteRatings((prev) => ({ ...prev, ...ratingsMap }))
+        const allFavs = tasteProfile?.favorites || []
+        const newIds = allFavs.map(f => Number(f.tmdbId || f.id)).filter(Boolean)
+        const newRatings = {}
+        allFavs.forEach(f => {
+          const id = Number(f.tmdbId || f.id)
+          if (id) newRatings[id] = f.rating !== undefined ? f.rating : 3
+        })
+
+        setSelectedFilms((prev) => Array.from(new Set([...prev, ...newIds, ...(films || [])])))
+        setFavoriteRatings((prev) => ({ ...prev, ...newRatings, ...ratingsMap }))
 
         if (newSessionId) {
           setSessionId(newSessionId)
@@ -319,6 +386,7 @@ export function TasteProvider({ children }) {
           try {
             const parsedUser = JSON.parse(storedUser)
             parsedUser.tasteProfileComplete = true
+            parsedUser.selectedPosters = Array.from(new Set([...(parsedUser.selectedPosters || []), ...newIds, ...(films || [])]))
             localStorage.setItem('user', JSON.stringify(parsedUser))
           } catch (e) {}
         }
@@ -427,6 +495,7 @@ export function TasteProvider({ children }) {
         updateWatchedOutcomes,
         cachedProfileRatings,
         updateProfileRatings,
+        fetchUserProfile,
       }}
     >
       {children}
