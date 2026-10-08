@@ -495,6 +495,7 @@ async function createEmbedding(profileText) {
               openaiClient.embeddings.create({
                 model: 'text-embedding-3-small',
                 input: profileText,
+                dimensions: 768,
               }),
             1,
             400,

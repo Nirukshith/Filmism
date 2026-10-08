@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Filmism runtime architecture",
+    "locale": "en",
+    "output": ".archify/architecture-filmism-runtime-20261007-200133/filmism-runtime.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Nirukshith/Filmism.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "ab49804a403ad0f2a6b9c4883fd47a1ada77fe04"
+    },
+    "views": [
+      {
+        "id": "primary-taste-path",
+        "label": "Taste initialize path",
+        "focus": ["cinephile", "react-spa", "express-api", "taste-cluster", "movie-profiling", "mongo-atlas"],
+        "note": "Onboarding POST /api/taste-profile/initialize through persist."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "cinephile",
+      "type": "external",
+      "label": "Cinephile",
+      "sublabel": "Browser user",
+      "icon": "person",
+      "pos": [40, 300],
+      "size": [136, 64],
+      "sources": [
+        { "path": "client/src/App.jsx", "line": 15, "end_line": 37, "label": "Taste then recommend routes" }
+      ]
+    },
+    {
+      "id": "react-spa",
+      "type": "frontend",
+      "label": "React SPA",
+      "sublabel": "Vite on Vercel",
+      "pos": [290, 300],
+      "size": [150, 64],
+      "sources": [
+        { "path": "client/src/services/api.js", "line": 3, "end_line": 21, "label": "Axios cookie + Bearer" },
+        { "path": "client/src/context/TasteContext.jsx", "line": 270, "end_line": 299, "label": "Initialize profile POST" },
+        { "path": "client/vercel.json", "line": 1, "end_line": 8, "label": "SPA rewrite to index.html" }
+      ]
+    },
+    {
+      "id": "jwt-guard",
+      "type": "security",
+      "label": "JWT guard",
+      "sublabel": "Cookie + Bearer",
+      "pos": [560, 100],
+      "size": [150, 64],
+      "sources": [
+        { "path": "server/middleware/authMiddleware.js", "line": 4, "end_line": 53, "label": "protect / optionalProtect" },
+        { "path": "server/controllers/authController.js", "line": 19, "end_line": 28, "label": "httpOnly Set-Cookie" }
+      ]
+    },
+    {
+      "id": "express-api",
+      "type": "backend",
+      "label": "Express API",
+      "sublabel": "Node :5001",
+      "pos": [560, 300],
+      "size": [150, 64],
+      "sources": [
+        { "path": "server/server.js", "line": 21, "end_line": 71, "label": "Helmet, CORS, /api mounts" },
+        { "path": "server/routes/tasteProfileRoutes.js", "line": 13, "end_line": 38, "label": "Rate-limited initialize" },
+        { "path": "server/docker-compose.yml", "line": 1, "end_line": 9, "label": "Container port 5001" }
+      ]
+    },
+    {
+      "id": "taste-cluster",
+      "type": "backend",
+      "label": "Taste clusters",
+      "sublabel": "Persona builder",
+      "pos": [830, 300],
+      "size": [160, 64],
+      "sources": [
+        { "path": "server/controllers/tasteProfileController.js", "line": 10, "end_line": 32, "label": "Initialize handler" },
+        { "path": "server/services/tasteClusterService.js", "line": 600, "end_line": 629, "label": "Profile then cluster" },
+        { "path": "server/services/tasteClusterService.js", "line": 710, "end_line": 730, "label": "Upsert UserTasteProfile" }
+      ]
+    },
+    {
+      "id": "movie-profiling",
+      "type": "backend",
+      "label": "Movie profiling",
+      "sublabel": "Cache then TMDB",
+      "pos": [1110, 300],
+      "size": [160, 64],
+      "sources": [
+        { "path": "server/services/movieProfilingService.js", "line": 12, "end_line": 16, "label": "Fetch TMDB details" },
+        { "path": "server/services/movieProfilingService.js", "line": 82, "end_line": 132, "label": "Cache / heuristic profile" },
+        { "path": "server/services/movieProfilingService.js", "line": 185, "end_line": 206, "label": "Batch get-or-profile" }
+      ]
+    },
+    {
+      "id": "rec-engine",
+      "type": "backend",
+      "label": "Rec engine",
+      "sublabel": "Ranked films",
+      "pos": [560, 500],
+      "size": [150, 64],
+      "sources": [
+        { "path": "server/routes/recommendationRoutes.js", "line": 30, "end_line": 31, "label": "GET /ranked" },
+        { "path": "server/controllers/recommendationController.js", "line": 74, "end_line": 101, "label": "Load profile, rank" },
+        { "path": "server/services/recommendationEngine.js", "line": 254, "end_line": 310, "label": "Candidates + cosine score" }
+      ]
+    },
+    {
+      "id": "mongo-atlas",
+      "type": "database",
+      "label": "MongoDB Atlas",
+      "sublabel": "Docs + vectors",
+      "pos": [1390, 300],
+      "size": [160, 64],
+      "sources": [
+        { "path": "server/config/db.js", "line": 25, "end_line": 33, "label": "mongoose.connect" },
+        { "path": "server/models/userTasteProfileModel.js", "line": 21, "end_line": 28, "label": "Cluster centroid fields" },
+        { "path": "server/config/atlasVectorIndexes.js", "line": 10, "end_line": 32, "label": "movie_vector_index" }
+      ]
+    },
+    {
+      "id": "tmdb",
+      "type": "external",
+      "label": "TMDB API",
+      "sublabel": "Film metadata",
+      "pos": [1110, 640],
+      "size": [160, 64],
+      "sources": [
+        { "path": "server/services/tmdbService.js", "line": 14, "end_line": 21, "label": "Bearer api.themoviedb.org" },
+        { "path": "server/services/movieProfilingService.js", "line": 96, "end_line": 99, "label": "GET /movie/:id" }
+      ]
+    },
+    {
+      "id": "llm-providers",
+      "type": "external",
+      "label": "LLM providers",
+      "sublabel": "Cluster + embed",
+      "pos": [830, 640],
+      "size": [160, 64],
+      "sources": [
+        { "path": "server/services/tasteClusterService.js", "line": 406, "end_line": 432, "label": "DeepSeek clustering first" },
+        { "path": "server/services/aiService.js", "line": 379, "end_line": 446, "label": "Gemini, OpenAI, heuristic" },
+        { "path": "server/services/aiService.js", "line": 452, "end_line": 466, "label": "Gemini embeddings" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Vercel frontend origin",
+      "wraps": ["react-spa"],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "Docker API :5001 / Helmet + CORS",
+      "wraps": ["jwt-guard", "express-api", "taste-cluster", "movie-profiling", "rec-engine"],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "MongoDB Atlas",
+      "wraps": ["mongo-atlas"],
+      "pad": 18
+    },
+    {
+      "kind": "region",
+      "label": "Third-party APIs",
+      "wraps": ["tmdb", "llm-providers"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "cinephile-spa",
+      "from": "cinephile",
+      "to": "react-spa",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "spa-api",
+      "from": "react-spa",
+      "to": "express-api",
+      "label": "REST + cookies",
+      "variant": "emphasis"
+    },
+    {
+      "id": "jwt-api",
+      "from": "jwt-guard",
+      "to": "express-api",
+      "label": "verify JWT",
+      "variant": "security"
+    },
+    {
+      "id": "api-taste",
+      "from": "express-api",
+      "to": "taste-cluster",
+      "label": "initialize",
+      "variant": "emphasis"
+    },
+    {
+      "id": "taste-profile",
+      "from": "taste-cluster",
+      "to": "movie-profiling",
+      "label": "batch profile",
+      "variant": "emphasis"
+    },
+    {
+      "id": "profile-mongo",
+      "from": "movie-profiling",
+      "to": "mongo-atlas",
+      "label": "upsert embeddings",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-recs",
+      "from": "express-api",
+      "to": "rec-engine",
+      "label": "GET /ranked"
+    },
+    {
+      "id": "profile-tmdb",
+      "from": "movie-profiling",
+      "to": "tmdb",
+      "label": "GET /movie"
+    },
+    {
+      "id": "taste-llm",
+      "from": "taste-cluster",
+      "to": "llm-providers",
+      "label": "cluster JSON",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Trust boundary facts",
+      "items": [
+        "CORS allowlists CLIENT_URL, localhost, and *.vercel.app; Helmet is enabled; trust proxy is on for cookies.",
+        "Taste initialize and ranked recs use optionalProtect (guest sessionId still accepted). Matching, DMs, and safety use protect; admin routes add adminOnly.",
+        "Tokens are set httpOnly with SameSite=None in production; the SPA also sends Authorization: Bearer from localStorage."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What the rec path reads",
+      "items": [
+        "GET /api/recommendations/ranked loads UserTasteProfile then scores MovieProfile embeddings with cosine similarity (65%) plus tag overlap (35%).",
+        "Candidate replenishment calls TMDB /discover and /recommendations in the background; Atlas $vectorSearch is used for similar-movie lookup with in-memory fallback.",
+        "UserTasteProfile.findOneAndUpdate in tasteClusterService persists clusters, globalCentroid, and aiSynthesis on the same Atlas cluster."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Secondary product surfaces",
+      "items": [
+        "Cinephile Twin matching is JWT-gated and rate-limited; cosine similarity runs on globalCentroid / cluster centroids.",
+        "Conversations require protect and poll for messages. Block, report, and admin ban live under /api/safety and /api/users.",
+        "Gmail SMTP (smtp.gmail.com:465) sends OTP and suspension mail. Nginx, Certbot, and EC2 appear in README, not as in-repo runtime units."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Provider fallbacks",
+      "items": [
+        "Clustering tries DeepSeek, OpenRouter, Gemini, then OpenAI, then a local heuristic partition if every client fails or times out (AI_TIMEOUT_MS, default 10s).",
+        "Fast-path movie profiling writes a 768-d heuristic embedding and may enrich via analyzeFilm / createEmbedding in the background.",
+        "Evidence is pinned to commit ab49804a; server/services/aiService.js has local uncommitted edits that are not cited as HEAD behavior."
+      ]
+    }
+  ]
+}
