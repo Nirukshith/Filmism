@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import styled from 'styled-components'
 import { Link, useNavigate } from 'react-router-dom'
+import { getAuthStatus } from '../utils/auth'
 import ryanImage from '../assets/ryan.webp'
 import emmaImage from '../assets/emma.webp'
 
@@ -161,6 +163,19 @@ const Subtitle = styled.p`
 
 function LandingPage() {
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const { isAuthenticated, tasteProfileComplete, user } = getAuthStatus()
+    if (isAuthenticated) {
+      if (user?.role === 'admin') {
+        navigate('/admin', { replace: true })
+      } else if (tasteProfileComplete) {
+        navigate('/recommend', { replace: true })
+      } else {
+        navigate('/taste', { replace: true })
+      }
+    }
+  }, [navigate])
 
   const handleTryAsGuest = (e) => {
     e.preventDefault()
