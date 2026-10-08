@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "c08d538e-17a2-49ab-ac81-eb3f068aa507",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/nirukshithpremkumar/filmism/.archify/architecture-filmism-runtime-20261007-200133/candidate.json",
+  "output": "/Users/nirukshithpremkumar/filmism/.archify/architecture-filmism-runtime-20261007-200133/filmism-runtime.html",
+  "specification": {
+    "sha256": "ec649acc78fbb0aa9eadc3e94052570f48f6f3c49506c4c9ef7477096fe90196",
+    "bytes": 10114
+  },
+  "artifact": {
+    "sha256": "c7e080d04ce2be7987f9042ba6e5b47fa85ddc93a3ebb0bffef3eaafa15a525b",
+    "bytes": 773668
+  }
+}
