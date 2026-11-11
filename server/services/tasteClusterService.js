@@ -4,6 +4,8 @@ const UserTasteProfile = require('../models/userTasteProfileModel');
 const User = require('../models/userModel');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
+const { parseLLMJson } = require('../utils/llmJsonParser');
+const { tasteClustersLLMSchema } = require('../validators/llmValidators');
 
 const GEMINI_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
 const OPENAI_KEY = (process.env.OPENAI_API_KEY || '').trim();
@@ -427,10 +429,10 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
         AI_TIMEOUT_MS,
         'DeepSeek Taste Clustering'
       );
-      const parsed = JSON.parse(completion.choices[0].message.content.trim());
-      if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
-        return parsed;
-      }
+      const responseText = completion.choices[0].message.content;
+      const parsed = parseLLMJson(responseText);
+      const validated = tasteClustersLLMSchema.parse(parsed);
+      return validated;
     } catch (err) {
       console.warn('DeepSeek clustering warning:', err.message);
     }
@@ -460,10 +462,10 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
         AI_TIMEOUT_MS,
         'OpenRouter Taste Clustering'
       );
-      const parsed = JSON.parse(completion.choices[0].message.content.trim());
-      if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
-        return parsed;
-      }
+      const responseText = completion.choices[0].message.content;
+      const parsed = parseLLMJson(responseText);
+      const validated = tasteClustersLLMSchema.parse(parsed);
+      return validated;
     } catch (err) {
       console.warn('OpenRouter clustering warning:', err.message);
     }
@@ -490,10 +492,10 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
         AI_TIMEOUT_MS,
         'Gemini Taste Clustering'
       );
-      const parsed = JSON.parse(result.response.text().trim());
-      if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
-        return parsed;
-      }
+      const responseText = result.response.text();
+      const parsed = parseLLMJson(responseText);
+      const validated = tasteClustersLLMSchema.parse(parsed);
+      return validated;
     } catch (err) {
       console.warn('Gemini clustering warning:', err.message);
     }
@@ -522,10 +524,10 @@ Respond ONLY with a valid JSON object strictly matching this schema (no markdown
         AI_TIMEOUT_MS,
         'OpenAI Taste Clustering'
       );
-      const parsed = JSON.parse(completion.choices[0].message.content.trim());
-      if (Array.isArray(parsed.clusters) && parsed.clusters.length > 0) {
-        return parsed;
-      }
+      const responseText = completion.choices[0].message.content;
+      const parsed = parseLLMJson(responseText);
+      const validated = tasteClustersLLMSchema.parse(parsed);
+      return validated;
     } catch (err) {
       console.warn('OpenAI clustering failed:', err.message);
     }
