@@ -1,5 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
+const { parseLLMJson } = require('../utils/llmJsonParser');
+const { filmProfileLLMSchema } = require('../validators/llmValidators');
 
 const GEMINI_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
 const OPENAI_KEY = (process.env.OPENAI_API_KEY || '').trim();
@@ -334,8 +336,8 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
         'DeepSeek Film Analysis'
       );
 
-      const responseText = completion.choices[0].message.content.trim();
-      const parsed = JSON.parse(responseText);
+      const responseText = completion.choices[0].message.content;
+      const parsed = parseLLMJson(responseText);
       return sanitizeProfile(parsed, movieData);
     } catch (err) {
       console.warn('DeepSeek analysis warning:', err.message);
@@ -368,8 +370,8 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
         'OpenRouter Film Analysis'
       );
 
-      const responseText = completion.choices[0].message.content.trim();
-      const parsed = JSON.parse(responseText);
+      const responseText = completion.choices[0].message.content;
+      const parsed = parseLLMJson(responseText);
       return sanitizeProfile(parsed, movieData);
     } catch (err) {
       console.warn('OpenRouter analysis warning:', err.message);
@@ -400,8 +402,8 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
         'Gemini Film Analysis'
       );
 
-      const responseText = result.response.text().trim();
-      const parsed = JSON.parse(responseText);
+      const responseText = result.response.text();
+      const parsed = parseLLMJson(responseText);
       return sanitizeProfile(parsed, movieData);
     } catch (err) {
       console.warn('Gemini analysis warning:', err.message);
@@ -433,8 +435,8 @@ Respond ONLY with a valid JSON object strictly conforming to this structure (no 
         'OpenAI Film Analysis'
       );
 
-      const responseText = completion.choices[0].message.content.trim();
-      const parsed = JSON.parse(responseText);
+      const responseText = completion.choices[0].message.content;
+      const parsed = parseLLMJson(responseText);
       return sanitizeProfile(parsed, movieData);
     } catch (err) {
       console.warn('OpenAI analysis failed:', err.message);
@@ -523,22 +525,13 @@ async function createEmbedding(profileText) {
 }
 
 /**
- * Clean & validate AI output fields
+ * Clean & validate AI output fields using Zod schema
  */
-function sanitizeProfile(parsed, movieData) {
-  const allowedPacing = ['slow-burn', 'moderate', 'fast-paced', 'frenetic'];
-  const pacingVal = (parsed.pacing || '').toLowerCase();
-
+function sanitizeProfile(parsed, movieData = {}) {
+  const validated = filmProfileLLMSchema.parse(parsed);
   return {
-    themes: Array.isArray(parsed.themes) ? parsed.themes.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [],
-    mood: Array.isArray(parsed.mood) ? parsed.mood.map((m) => String(m).trim().toLowerCase()).filter(Boolean) : [],
-    narrativeStyle: Array.isArray(parsed.narrativeStyle) ? parsed.narrativeStyle.map((s) => String(s).trim().toLowerCase()).filter(Boolean) : [],
-    visualAesthetic: Array.isArray(parsed.visualAesthetic) ? parsed.visualAesthetic.map((v) => String(v).trim().toLowerCase()).filter(Boolean) : [],
-    pacing: allowedPacing.includes(pacingVal) ? pacingVal : 'moderate',
-    emotionalTone: Array.isArray(parsed.emotionalTone) ? parsed.emotionalTone.map((e) => String(e).trim().toLowerCase()).filter(Boolean) : [],
-    characterArchetypes: Array.isArray(parsed.characterArchetypes) ? parsed.characterArchetypes.map((c) => String(c).trim().toLowerCase()).filter(Boolean) : [],
-    culturalTradition: typeof parsed.culturalTradition === 'string' ? parsed.culturalTradition.trim() : (movieData.originCountries?.[0] || 'Global'),
-    aiSummary: typeof parsed.aiSummary === 'string' ? parsed.aiSummary.trim() : '',
+    ...validated,
+    culturalTradition: validated.culturalTradition || movieData.originCountries?.[0] || 'Global',
   };
 }
 
@@ -568,4 +561,5 @@ module.exports = {
   buildEmbeddingString,
   generateHeuristicProfile,
   generateHeuristicEmbedding,
+  sanitizeProfile,
 };
